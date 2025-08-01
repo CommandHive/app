@@ -2,6 +2,7 @@
 
 import { useSession, signIn, signOut } from 'next-auth/react'
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { apiService, User } from '@/lib/api'
 import '@/types/auth'
 
@@ -48,20 +49,42 @@ export default function Navbar() {
         <div className="flex justify-between h-16">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <h1 className="text-xl font-bold text-gray-800">CommandHive</h1>
+              <Link href="/">
+                <h1 className="text-xl font-bold text-gray-800 hover:text-gray-600 cursor-pointer">CommandHive</h1>
+              </Link>
             </div>
           </div>
           
           <div className="flex items-center space-x-4">
+            <Link
+              href="/leaderboard"
+              className="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded transition duration-200"
+            >
+              Leaderboard
+            </Link>
             {status === 'loading' || loading ? (
               <div className="text-gray-500">Loading...</div>
             ) : session ? (
-              <button
-                onClick={handleSignOut}
-                className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition duration-200"
-              >
-                Sign Out
-              </button>
+              <div className="flex items-center space-x-4">
+                <Link
+                  href="/my-servers"
+                  className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition duration-200"
+                >
+                  My Servers
+                </Link>
+                <Link
+                  href="/my-earnings"
+                  className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition duration-200"
+                >
+                  My Earnings
+                </Link>
+                <button
+                  onClick={handleSignOut}
+                  className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition duration-200"
+                >
+                  Sign Out
+                </button>
+              </div>
             ) : (
               <div className="flex space-x-2">
                 <button

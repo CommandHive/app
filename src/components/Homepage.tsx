@@ -2,7 +2,9 @@
 
 import { useSession } from 'next-auth/react'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline'
+import { apiService } from '@/lib/api'
 
 const examplePrompts = [
   {
@@ -67,12 +69,33 @@ export default function Homepage() {
   const { data: session, status } = useSession()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedExample, setSelectedExample] = useState<number | null>(null)
+  const [isCreatingChat, setIsCreatingChat] = useState(false)
+  const router = useRouter()
 
-  const handleSearch = () => {
-    if (!session) return
-    if (!searchQuery.trim()) return
+  const handleSearch = async () => {
+    console.log('handleSearch called')
+    console.log('Session:', session)
+    console.log('Session accessToken:', session?.accessToken)
+    console.log('Search query:', searchQuery)
+    console.log('isAuthenticated:', isAuthenticated)
     
-    console.log('Searching for:', searchQuery)
+    if (!session?.accessToken) {
+      console.log('No session or access token available')
+      alert('Please sign in first to create a chat')
+      return
+    }
+    
+    if (!searchQuery.trim()) {
+      console.log('No search query provided')
+      alert('Please enter a description for your MCP server')
+      return
+    }
+    
+    // Redirect immediately with the prompt in URL
+    const encodedPrompt = encodeURIComponent(searchQuery)
+    const chatUrl = `/chat/new?prompt=${encodedPrompt}`
+    console.log('Redirecting to:', chatUrl)
+    router.push(chatUrl)
   }
 
   const handleExampleClick = (example: typeof examplePrompts[0]) => {
@@ -107,15 +130,22 @@ export default function Homepage() {
                 disabled={!isAuthenticated}
               />
               <button
-                onClick={handleSearch}
-                disabled={!isAuthenticated || !searchQuery.trim()}
+                onClick={() => {
+                  console.log('Search button clicked!')
+                  handleSearch()
+                }}
+                disabled={!isAuthenticated || !searchQuery.trim() || isCreatingChat}
                 className={`absolute right-2 top-1/2 transform -translate-y-1/2 p-3 rounded-full transition-colors ${
-                  isAuthenticated && searchQuery.trim()
+                  isAuthenticated && searchQuery.trim() && !isCreatingChat
                     ? 'bg-blue-500 hover:bg-blue-600 text-white'
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 }`}
               >
-                <MagnifyingGlassIcon className="h-5 w-5" />
+                {isCreatingChat ? (
+                  <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <MagnifyingGlassIcon className="h-5 w-5" />
+                )}
               </button>
             </div>
             

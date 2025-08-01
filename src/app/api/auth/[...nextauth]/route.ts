@@ -55,6 +55,9 @@ async function createBackendSession(user: any, account: any) {
 
 const handler = NextAuth({
   adapter: PrismaAdapter(prisma),
+  session: {
+    strategy: 'jwt'
+  },
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -113,11 +116,22 @@ const handler = NextAuth({
       return session
     },
     async jwt({ token, user, account }) {
-      console.log('JWT callback triggered:', { hasUser: !!user, hasAccount: !!account })
+      console.log('JWT callback triggered:', { hasUser: !!user, hasAccount: !!account, hasToken: !!token.accessToken })
       
-      if (user?.accessToken) {
+      // If we have a user and account, try to create backend session
+      if (user && account && !token.accessToken) {
+        console.log('Creating backend session in JWT callback')
+        const backendToken = await createBackendSession(user, account)
+        if (backendToken) {
+          token.accessToken = backendToken
+          console.log('Backend token stored in JWT token from JWT callback')
+        }
+      }
+      
+      // Also check if user already has accessToken from signIn callback
+      if (user?.accessToken && !token.accessToken) {
         token.accessToken = user.accessToken
-        console.log('Backend token stored in JWT token')
+        console.log('Backend token stored in JWT token from user object')
       }
       
       return token
