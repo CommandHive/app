@@ -1,16 +1,16 @@
 'use client'
 
 import { useSearchParams, useRouter } from 'next/navigation'
-import { useSession } from 'next-auth/react'
 import { useState, useEffect } from 'react'
 import ChatWindow from '@/components/ChatWindow'
 import TabbedInterface from '@/components/TabbedInterface'
 import { apiService } from '@/lib/api'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function NewChatPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { data: session } = useSession()
+  const { user, accessToken, isAuthenticated } = useAuth()
   const [isCreatingChat, setIsCreatingChat] = useState(true)
   const [chatId, setChatId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -19,15 +19,18 @@ export default function NewChatPage() {
   const prompt = searchParams.get('prompt') || ''
 
   useEffect(() => {
-    if (!session?.accessToken || !prompt) return
+    if (!isAuthenticated || !accessToken || !user) {
+      setError('Authentication required')
+      setIsCreatingChat(false)
+      return
+    }
 
     const createChat = async () => {
       try {
-        console.log('Creating chat with prompt:', prompt)
+        console.log('🆕 [NewChatPage] Creating chat with prompt:', prompt)
         const result = await apiService.createChat(
           prompt, 
-          session.accessToken as string, 
-          session.user?.email || undefined
+          accessToken
         )
         
         if (result?.chat_id) {
@@ -49,18 +52,7 @@ export default function NewChatPage() {
     }
 
     createChat()
-  }, [session, prompt])
-
-  if (!session) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-semibold text-gray-900 mb-4">Authentication Required</h1>
-          <p className="text-gray-600">Please sign in to access this chat.</p>
-        </div>
-      </div>
-    )
-  }
+  }, [prompt, isAuthenticated, accessToken, user])
 
   if (error) {
     return (

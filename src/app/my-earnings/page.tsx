@@ -1,6 +1,6 @@
 'use client'
 
-import { useSession } from 'next-auth/react'
+import { useAuth } from '@/contexts/AuthContext'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
@@ -93,15 +93,15 @@ const placeholderData: ServerEarnings[] = [
 ]
 
 export default function MyEarnings() {
-  const { data: session, status } = useSession()
+  const { user, isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
   const [earnings, setEarnings] = useState<ServerEarnings[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (status === 'loading') return
+    if (isLoading) return
 
-    if (!session) {
+    if (!isAuthenticated) {
       router.push('/')
       return
     }
@@ -111,9 +111,9 @@ export default function MyEarnings() {
       setEarnings(placeholderData)
       setLoading(false)
     }, 1000)
-  }, [session, status, router])
+  }, [isAuthenticated, isLoading, router])
 
-  if (status === 'loading' || loading) {
+  if (isLoading || loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -124,7 +124,7 @@ export default function MyEarnings() {
     )
   }
 
-  if (!session) {
+  if (!isAuthenticated) {
     return null
   }
 

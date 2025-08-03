@@ -1,31 +1,21 @@
-import { DefaultSession, DefaultUser } from "next-auth"
-import { JWT } from "next-auth/jwt"
+// Auth types for the new JWT-based authentication system
 
-// Backend session payload interface
-export interface BackendSessionPayload {
+export interface User {
+  id?: string
   email: string
-  name: string
-  provider: string
-  provider_id: string
+  display_name: string
   username?: string
-  image?: string
+  avatar_url?: string
+  subscription_tier: string
+  is_active: boolean
+  wallet_address?: string
 }
 
-// Extended User interface
-declare module "next-auth" {
-  interface Session extends DefaultSession {
-    accessToken?: string
-  }
-
-  interface User extends DefaultUser {
-    accessToken?: string
-    login?: string
-  }
-}
-
-// Extended JWT interface
-declare module "next-auth/jwt" {
-  interface JWT {
-    accessToken?: string
-  }
+export interface AuthResponse {
+  success: boolean
+  access_token: string
+  token_type: string
+  expires_in: number
+  user: User
+  error?: string
 }

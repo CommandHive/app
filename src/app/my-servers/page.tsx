@@ -1,38 +1,34 @@
 'use client'
 
-import { useSession } from 'next-auth/react'
+import { useAuth } from '@/contexts/AuthContext'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { apiService, ChatSession, ChatSessionsResponse } from '@/lib/api'
 import { ClockIcon, ServerIcon, ArrowRightIcon } from '@heroicons/react/24/outline'
+import ProtectedRoute from '@/components/Auth/ProtectedRoute'
 
 export default function MyServersPage() {
-  const { data: session, status } = useSession()
+  const { accessToken, isAuthenticated, isLoading: authLoading } = useAuth()
   const router = useRouter()
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/')
-      return
-    }
-
-    if (session?.accessToken) {
+    if (!authLoading && isAuthenticated && accessToken) {
       fetchSessions()
     }
-  }, [session, status, router])
+  }, [accessToken, isAuthenticated, authLoading])
 
   const fetchSessions = async () => {
-    if (!session?.accessToken) return
+    if (!accessToken) return
 
     try {
       setLoading(true)
       setError(null)
       console.log('Fetching chat sessions...')
       
-      const response: ChatSessionsResponse | null = await apiService.getChatSessions(session.accessToken as string)
+      const response: ChatSessionsResponse | null = await apiService.getChatSessions(accessToken)
       
       if (response && response.success) {
         console.log('Sessions fetched successfully:', response.sessions)
@@ -58,30 +54,9 @@ export default function MyServersPage() {
     router.push(`/chat/${sessionId}`)
   }
 
-  if (status === 'loading') {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (status === 'unauthenticated') {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-semibold text-gray-900 mb-4">Authentication Required</h1>
-          <p className="text-gray-600">Please sign in to view your MCP servers.</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50">
+    <ProtectedRoute>
+      <div className="min-h-screen bg-gray-50">
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -197,7 +172,8 @@ export default function MyServersPage() {
             )}
           </>
         )}
+        </div>
       </div>
-    </div>
+    </ProtectedRoute>
   )
 }

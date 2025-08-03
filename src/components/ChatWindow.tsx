@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
 import { PaperAirplaneIcon } from '@heroicons/react/24/outline'
+import { useAuth } from '@/contexts/AuthContext'
 import { apiService } from '@/lib/api'
 
 interface ChatMessage {
@@ -20,7 +20,7 @@ interface ChatWindowProps {
 }
 
 export default function ChatWindow({ chatId, initialPrompt, isCreatingChat, chatData }: ChatWindowProps) {
-  const { data: session } = useSession()
+  const { accessToken: sessionToken, isAuthenticated } = useAuth()
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     const initialMessages: ChatMessage[] = []
     
@@ -73,7 +73,7 @@ export default function ChatWindow({ chatId, initialPrompt, isCreatingChat, chat
   }, [isCreatingChat, initialPrompt, messages.length, chatData])
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim() || !session?.accessToken || !chatId || chatId === 'creating') return
+    if (!inputMessage.trim() || !sessionToken || !isAuthenticated || !chatId || chatId === 'creating') return
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -88,7 +88,7 @@ export default function ChatWindow({ chatId, initialPrompt, isCreatingChat, chat
 
     try {
       console.log('Sending message to chat_session_id:', chatId)
-      const response = await apiService.sendMessage(chatId, inputMessage, session.accessToken as string)
+      const response = await apiService.sendMessage(chatId, inputMessage, sessionToken as string)
       
       if (response && response.message) {
         const assistantMessage: ChatMessage = {

@@ -1,14 +1,14 @@
 'use client'
 
 import { useParams } from 'next/navigation'
-import { useSession } from 'next-auth/react'
+import { useAuth } from '@/contexts/AuthContext'
 import { useState, useEffect } from 'react'
 import ChatWindow from '@/components/ChatWindow'
 import TabbedInterface from '@/components/TabbedInterface'
 
 export default function ChatPage() {
   const params = useParams()
-  const { data: session } = useSession()
+  const { user, isAuthenticated } = useAuth()
   const [isLoading, setIsLoading] = useState(true)
   const chatId = params.id as string
 
@@ -21,7 +21,7 @@ export default function ChatPage() {
     return () => clearTimeout(timer)
   }, [])
 
-  if (!session) {
+  if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">

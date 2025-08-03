@@ -1,9 +1,9 @@
 'use client'
 
-import { useSession } from 'next-auth/react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline'
+import { useAuth } from '@/contexts/AuthContext'
 import { apiService } from '@/lib/api'
 
 const examplePrompts = [
@@ -66,21 +66,41 @@ const examplePrompts = [
 ]
 
 export default function Homepage() {
-  const { data: session, status } = useSession()
+  const { accessToken: sessionToken, isAuthenticated, user: session } = useAuth()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedExample, setSelectedExample] = useState<number | null>(null)
   const [isCreatingChat, setIsCreatingChat] = useState(false)
+  const [localStorageToken, setLocalStorageToken] = useState<string | null>(null)
   const router = useRouter()
 
+  // Safely check localStorage on client side only
+  useEffect(() => {
+    console.log('🏠 [Homepage] ===== HOMEPAGE USEEFFECT TRIGGERED =====')
+    const sessionTokenStored = localStorage.getItem('session_token')
+    const jwtToken = localStorage.getItem('jwt_token')
+    console.log('🏠 [Homepage] localStorage session_token found:', !!sessionTokenStored)
+    console.log('🏠 [Homepage] localStorage jwt_token found:', !!jwtToken)
+    console.log('🏠 [Homepage] sessionToken from hook:', !!sessionToken)
+    console.log('🏠 [Homepage] sessionToken (first 20 chars):', sessionToken ? sessionToken.substring(0, 20) + '...' : 'NO TOKEN')
+    setLocalStorageToken(sessionTokenStored || jwtToken)
+  }, [sessionToken])
+
   const handleSearch = async () => {
-    console.log('handleSearch called')
-    console.log('Session:', session)
-    console.log('Session accessToken:', session?.accessToken)
-    console.log('Search query:', searchQuery)
-    console.log('isAuthenticated:', isAuthenticated)
+    console.log('🔍 [Homepage.handleSearch] ===== HANDLE SEARCH CALLED =====')
+    console.log('🔍 [Homepage.handleSearch] Session status:', status)
+    console.log('🔍 [Homepage.handleSearch] Session object:', session)
+    console.log('🔍 [Homepage.handleSearch] Session keys:', session ? Object.keys(session) : 'no session')
+    console.log('🔍 [Homepage.handleSearch] sessionToken from hook:', sessionToken)
+    console.log('🔍 [Homepage.handleSearch] Search query:', searchQuery)
+    console.log('🔍 [Homepage.handleSearch] isAuthenticated:', isAuthenticated)
+    console.log('🔍 [Homepage.handleSearch] localStorage token:', localStorageToken)
     
-    if (!session?.accessToken) {
-      console.log('No session or access token available')
+    // Check for session token first, then fall back to localStorage
+    const token = sessionToken || localStorageToken
+    console.log('🔍 [Homepage.handleSearch] Final token to use:', token ? token.substring(0, 20) + '...' : 'NO TOKEN')
+    
+    if (!token) {
+      console.log('❌ [Homepage.handleSearch] No session token available')
       alert('Please sign in first to create a chat')
       return
     }
@@ -103,7 +123,9 @@ export default function Homepage() {
     setSelectedExample(example.id)
   }
 
-  const isAuthenticated = status === 'authenticated' && session
+  // Check authentication from session token hook and localStorage fallback
+  const hasToken = sessionToken || localStorageToken
+  const authenticatedState = isAuthenticated || hasToken
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -127,7 +149,7 @@ export default function Homepage() {
                 placeholder="Describe the MCP server you want to create..."
                 className="w-full px-6 py-4 text-lg border-2 border-gray-300 rounded-full focus:outline-none focus:border-blue-500 pr-16"
                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                disabled={!isAuthenticated}
+                disabled={!authenticatedState}
               />
               <button
                 onClick={() => {

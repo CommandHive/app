@@ -1,6 +1,6 @@
 'use client'
 
-import { useSession } from 'next-auth/react'
+import { useAuth } from '@/contexts/AuthContext'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
@@ -248,7 +248,7 @@ const placeholderData: LeaderboardEntry[] = [
 const sortedData = [...placeholderData].sort((a, b) => b.totalEarnings - a.totalEarnings)
 
 export default function Leaderboard() {
-  const { data: session } = useSession()
+  const { user, isAuthenticated } = useAuth()
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [userRank, setUserRank] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
@@ -280,7 +280,7 @@ export default function Leaderboard() {
   useEffect(() => {
     // Simulate API call delay
     setTimeout(() => {
-      if (session) {
+      if (isAuthenticated) {
         // Show full leaderboard with user's position
         setLeaderboard(sortedData)
         const userIndex = sortedData.findIndex(entry => entry.isCurrentUser)
@@ -291,7 +291,7 @@ export default function Leaderboard() {
       }
       setLoading(false)
     }, 1000)
-  }, [session])
+  }, [isAuthenticated])
 
   if (loading) {
     return (
@@ -304,7 +304,7 @@ export default function Leaderboard() {
     )
   }
 
-  const displayedLeaderboard = session ? leaderboard : leaderboard.slice(0, 20)
+  const displayedLeaderboard = isAuthenticated ? leaderboard : leaderboard.slice(0, 20)
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -312,7 +312,7 @@ export default function Leaderboard() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">MCP Server Leaderboard</h1>
           <p className="mt-2 text-gray-600">Top performing MCP servers ranked by total earnings</p>
-          {session && userRank && (
+          {isAuthenticated && userRank && (
             <p className="mt-2 text-blue-600 font-medium">Your ranking: #{userRank}</p>
           )}
         </div>
@@ -321,7 +321,7 @@ export default function Leaderboard() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-lg font-medium text-gray-900">Total Servers</h3>
-            <p className="text-3xl font-bold text-blue-600">{session ? leaderboard.length : '20+'}</p>
+            <p className="text-3xl font-bold text-blue-600">{isAuthenticated ? leaderboard.length : '20+'}</p>
           </div>
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-lg font-medium text-gray-900">Top Earner</h3>
@@ -341,9 +341,9 @@ export default function Leaderboard() {
         <div className="bg-white shadow rounded-lg">
           <div className="px-6 py-4 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-900">
-              {session ? 'Full Rankings' : 'Top 20 Rankings'}
+              {isAuthenticated ? 'Full Rankings' : 'Top 20 Rankings'}
             </h2>
-            {!session && (
+            {!isAuthenticated && (
               <p className="text-sm text-gray-500 mt-1">
                 <Link href="/api/auth/signin" className="text-blue-600 hover:text-blue-800">
                   Sign in
@@ -377,9 +377,9 @@ export default function Leaderboard() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {displayedLeaderboard.map((entry, index) => {
-                  const isCurrentUser = entry.isCurrentUser && session
-                  const showEllipsis = session && index > 20 && index < (userRank || 0) - 3
-                  const shouldShow = !showEllipsis && (index < 20 || (session && (index >= (userRank || 0) - 3 && index <= (userRank || 0) + 1)))
+                  const isCurrentUser = entry.isCurrentUser && isAuthenticated
+                  const showEllipsis = isAuthenticated && index > 20 && index < (userRank || 0) - 3
+                  const shouldShow = !showEllipsis && (index < 20 || (isAuthenticated && (index >= (userRank || 0) - 3 && index <= (userRank || 0) + 1)))
                   
                   if (showEllipsis && index === 21) {
                     return (
@@ -465,7 +465,7 @@ export default function Leaderboard() {
           </div>
         </div>
 
-        {!session && (
+        {!isAuthenticated && (
           <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
             <h3 className="text-lg font-medium text-blue-900 mb-2">Want to see your ranking?</h3>
             <p className="text-blue-800 mb-4">Sign in to view the complete leaderboard and see where your MCP servers rank!</p>
