@@ -147,7 +147,7 @@ export default function Homepage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Describe the MCP server you want to create..."
-                className="w-full px-6 py-4 text-lg border-2 border-gray-300 rounded-full focus:outline-none focus:border-blue-500 pr-16"
+                className="w-full px-6 py-4 text-lg text-gray-900 border-2 border-gray-300 rounded-full focus:outline-none focus:border-blue-500 pr-16 placeholder-gray-500"
                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                 disabled={!authenticatedState}
               />

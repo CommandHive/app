@@ -31,6 +31,9 @@ export default function Navbar() {
             </div>
             
             <div className="flex items-center space-x-4">
+              {isAuthenticated && user && <span className="text-gray-700">
+                    Welcome, {user.display_name || user.email}
+                  </span>}
               <Link
                 href="/leaderboard"
                 className="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded transition duration-200"
@@ -42,9 +45,7 @@ export default function Navbar() {
                 <div className="text-gray-500">Loading...</div>
               ) : isAuthenticated && user ? (
                 <div className="flex items-center space-x-4">
-                  <span className="text-gray-700">
-                    Welcome, {user.display_name || user.email}
-                  </span>
+                  
                   <Link
                     href="/my-servers"
                     className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition duration-200"

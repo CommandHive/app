@@ -5,11 +5,24 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useState, useEffect } from 'react'
 import ChatWindow from '@/components/ChatWindow'
 import TabbedInterface from '@/components/TabbedInterface'
+import { apiService } from '@/lib/api'
+
+interface ChatMessage {
+  id: string
+  type: 'user' | 'assistant'
+  content: string
+  code?: string
+  next_steps?: string
+  is_deployable?: boolean
+  timestamp: Date
+}
 
 export default function ChatPage() {
   const params = useParams()
-  const { user, isAuthenticated } = useAuth()
+  const { user, isAuthenticated, accessToken: sessionToken } = useAuth()
   const [isLoading, setIsLoading] = useState(true)
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [isLoadingMessages, setIsLoadingMessages] = useState(true)
   const chatId = params.id as string
 
   useEffect(() => {
@@ -20,6 +33,46 @@ export default function ChatPage() {
 
     return () => clearTimeout(timer)
   }, [])
+
+  useEffect(() => {
+    const fetchMessages = async () => {
+      if (!sessionToken || !isAuthenticated || !chatId || chatId === 'creating') {
+        setIsLoadingMessages(false)
+        return
+      }
+
+      try {
+        const response = await apiService.getMessages(chatId, sessionToken as string)
+        console.log('Fetched messages:', response)
+        
+        if (response && response.success && response.messages) {
+          const fetchedMessages: ChatMessage[] = response.messages.map((msg: any) => ({
+            id: msg.id || Date.now().toString(),
+            type: msg.role === 'user' ? 'user' : 'assistant',
+            content: msg.next_steps || msg.content,
+            code: msg.code,
+            next_steps: msg.next_steps,
+            is_deployable: msg.is_deployable,
+            timestamp: new Date(msg.timestamp || msg.created_at || Date.now())
+          }))
+          setMessages(fetchedMessages)
+        } else {
+          // Fallback to initial messages if no messages are fetched
+          const initialMessages: ChatMessage[] = []
+          setMessages(initialMessages)
+        }
+      } catch (error) {
+        console.error('Error fetching messages:', error)
+        // Fallback to initial messages on error
+        const initialMessages: ChatMessage[] = []
+        setMessages(initialMessages)
+      } finally {
+        setIsLoadingMessages(false)
+      }
+    }
+
+    fetchMessages()
+  }, [chatId, sessionToken, isAuthenticated])
 
   if (!isAuthenticated) {
     return (
@@ -46,12 +99,17 @@ export default function ChatPage() {
         <div className="flex h-screen">
           {/* Chat Window - 30% of screen */}
           <div className="w-[30%] border-r border-gray-300 bg-white">
-            <ChatWindow chatId={chatId} />
+            <ChatWindow 
+              chatId={chatId} 
+              messages={messages}
+              setMessages={setMessages}
+              isLoadingMessages={isLoadingMessages}
+            />
           </div>
           
           {/* Tabbed Interface - 70% of screen */}
           <div className="w-[70%] bg-white">
-            <TabbedInterface chatId={chatId} />
+            <TabbedInterface chatId={chatId} messages={messages} />
           </div>
         </div>
       )}

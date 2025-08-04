@@ -280,6 +280,27 @@ class ApiService {
     }
   }
 
+  async getMessages(sessionId: string, token: string): Promise<any> {
+    try {
+      console.log('API getMessages - calling backend')
+
+      const response = await this.makeAuthenticatedRequest(`${API_BASE_URL}/chat/sessions/${sessionId}/messages`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(token),
+      }, token)
+
+      if (!response.ok) {
+        console.error('API getMessages - failed:', response.status)
+        return null
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error('API getMessages - error:', error)
+      return null
+    }
+  }
+
   // Helper method to get current token from localStorage
   getAuthToken(): string | null {
     return this.getStoredToken()

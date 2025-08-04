@@ -51,59 +51,43 @@ export default function MagicLinkForm({ onSwitchToOAuth }: MagicLinkFormProps) {
   }
 
   const handleGoogleLogin = async () => {
-  try {
-    const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
-    if (!googleClientId) {
-      setError('Google client ID not configured')
-      return
-    }
-
-    // Load Google Identity Services script if not already loaded
-    if (!window.google) {
-      const script = document.createElement('script')
-      script.src = 'https://accounts.google.com/gsi/client'
-      script.async = true
-      script.defer = true
-      document.head.appendChild(script)
-      
-      // Wait for script to load
-      await new Promise((resolve) => {
-        script.onload = resolve
-      })
-    }
-
-    // Initialize Google Sign-In
-    window.google.accounts.id.initialize({
-      client_id: googleClientId,
-      callback: async (response: { credential: string }) => {
-        try {
-          // Decode the Google JWT token
-          const payload = JSON.parse(atob(response.credential.split('.')[1]))
-          console.log('Google payload:', payload)
-          
-          const result = await loginWithOAuth('google', {
-            id: payload.sub,
-            email: payload.email,
-            name: payload.name,
-            picture: payload.picture
-          })
-          
-          if (!result.success) {
-            setError(result.error || 'Google login failed')
+    try {
+      // Initialize Google OAuth
+      if (typeof window !== 'undefined' && window.google) {
+        window.google.accounts.id.initialize({
+          client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+          use_fedcm_for_prompt: false,
+          callback: async (response: any) => {
+            try {
+              // Decode the Google JWT token
+              const payload = JSON.parse(atob(response.credential.split('.')[1]))
+              
+              const result = await loginWithOAuth('google', {
+                id: payload.sub,
+                email: payload.email,
+                name: payload.name,
+                picture: payload.picture
+              })
+              
+              if (!result.success) {
+                setError(result.error || 'Google login failed')
+              }
+            } catch (error) {
+              console.error('Google login error:', error)
+              setError('Google login failed')
+            }
           }
-        } catch (error) {
-          console.error('Google login error:', error)
-          setError('Google login failed')
-        }
-      }
-    })
+        })
 
-  
-  } catch (error) {
-    console.error('Google login error:', error)
-    setError('Google login failed')
+        window.google.accounts.id.prompt()
+      } else {
+        setError('Google Sign-In not available')
+      }
+    } catch (error) {
+      console.error('Google login error:', error)
+      setError('Google login failed')
+    }
   }
-}
 
   return (
     <div className="max-w-md mx-auto mt-8 p-6 bg-white rounded-lg shadow-md">

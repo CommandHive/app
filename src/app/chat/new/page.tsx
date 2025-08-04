@@ -1,7 +1,7 @@
 'use client'
 
 import { useSearchParams, useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import ChatWindow from '@/components/ChatWindow'
 import TabbedInterface from '@/components/TabbedInterface'
 import { apiService } from '@/lib/api'
@@ -15,15 +15,29 @@ export default function NewChatPage() {
   const [chatId, setChatId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [chatData, setChatData] = useState<any>(null)
+  const [messages, setMessages] = useState<any[]>([])
+  
+  // Prevent double API calls in development (React Strict Mode)
+  const hasCreatedChat = useRef(false)
+  const isCreating = useRef(false)
   
   const prompt = searchParams.get('prompt') || ''
 
   useEffect(() => {
+    // Early return if not authenticated
     if (!isAuthenticated || !accessToken || !user) {
       setError('Authentication required')
       setIsCreatingChat(false)
       return
     }
+
+    // Prevent double calls
+    if (hasCreatedChat.current || isCreating.current) {
+      return
+    }
+
+    // Mark as creating to prevent race conditions
+    isCreating.current = true
 
     const createChat = async () => {
       try {
@@ -40,19 +54,25 @@ export default function NewChatPage() {
           setChatData(result.data)
           // Update URL to the actual chat ID without redirect
           window.history.replaceState({}, '', `/chat/${result.chat_id}`)
+          // Mark as successfully created
+          hasCreatedChat.current = true
         } else {
           setError('Failed to create chat')
         }
       } catch (error) {
         console.error('Error creating chat:', error)
         setError('Failed to create chat')
+        // Reset flags on error so user can retry
+        hasCreatedChat.current = false
+        isCreating.current = false
       } finally {
         setIsCreatingChat(false)
+        isCreating.current = false
       }
     }
 
     createChat()
-  }, [prompt, isAuthenticated, accessToken, user])
+  }, [isAuthenticated, accessToken, user, prompt])
 
   if (error) {
     return (
@@ -60,6 +80,18 @@ export default function NewChatPage() {
         <div className="text-center">
           <h1 className="text-2xl font-semibold text-red-600 mb-4">Error</h1>
           <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={() => {
+              // Reset error state and flags for retry
+              setError(null)
+              setIsCreatingChat(true)
+              hasCreatedChat.current = false
+              isCreating.current = false
+            }}
+            className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 mr-4"
+          >
+            Try Again
+          </button>
           <button
             onClick={() => router.push('/')}
             className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
@@ -81,6 +113,7 @@ export default function NewChatPage() {
             initialPrompt={prompt}
             isCreatingChat={isCreatingChat}
             chatData={chatData}
+            onMessagesUpdate={setMessages}
           />
         </div>
         
@@ -95,7 +128,7 @@ export default function NewChatPage() {
               </div>
             </div>
           ) : (
-            <TabbedInterface chatId={chatId || ''} chatData={chatData} />
+            <TabbedInterface chatId={chatId || ''} chatData={chatData} messages={messages} />
           )}
         </div>
       </div>
