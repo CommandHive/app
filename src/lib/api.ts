@@ -196,10 +196,10 @@ class ApiService {
       
       const payload = {
         chat_id: chatId,
-        message: message
+        prompt: message
       }
 
-      const response = await fetch(`${API_BASE_URL}/chat/message`, {
+      const response = await fetch(`${API_BASE_URL}/chat/create`, {
         method: 'POST',
         headers: this.getAuthHeaders(token),
         body: JSON.stringify(payload),

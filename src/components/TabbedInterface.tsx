@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ClipboardIcon, CheckIcon, PlayIcon, ChevronDownIcon } from '@heroicons/react/24/outline'
 
 interface Tab {
@@ -253,10 +253,12 @@ export default function TabbedInterface({ chatId, chatData, messages = [] }: Tab
   }
 
   const ToolCallCard = ({ toolCall }: { toolCall: ToolCall }) => {
-    // Initialize state if not exists
-    if (!toolCallStates[toolCall.id]) {
-      initializeToolCallState(toolCall.id)
-    }
+    // Initialize state if not exists using useEffect
+    useEffect(() => {
+      if (!toolCallStates[toolCall.id]) {
+        initializeToolCallState(toolCall.id)
+      }
+    }, [toolCall.id])
 
     const state = toolCallStates[toolCall.id] || { isPaid: false, amount: '', isExecuting: false }
     

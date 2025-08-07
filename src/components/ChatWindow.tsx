@@ -170,9 +170,11 @@ export default function ChatWindow({ chatId, initialPrompt, isCreatingChat, chat
 
     try {
       console.log('Sending message to chat_session_id:', chatId)
+      console.log('Message content:', inputMessage)
+      console.log('Session token:', sessionToken)
       const response = await apiService.sendMessage(chatId, inputMessage, sessionToken as string)
       
-      if (response && response.message) {
+      if (response) {
         const assistantMessage: ChatMessage = {
           id: (Date.now() + 1).toString(),
           type: 'assistant',
@@ -250,15 +252,25 @@ export default function ChatWindow({ chatId, initialPrompt, isCreatingChat, chat
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
-                      // Custom styling for code blocks
-                      code: ({ node, className, children, ...props }) => {
-                        const match = /language-(\w+)/.exec(className || '')
+                      // Custom styling for code blocks and inline code
+                      code: ({ node, inline, className, children, ...props }) => {
                         const { ref, ...restProps } = props
-                        return  (
-                          <pre className={`bg-gray-800 text-gray-100 p-2 rounded text-xs overflow-x-auto ${className}`} {...restProps}>
-                            <code>{children}</code>
-                          </pre>
-                        ) 
+                        if (inline) {
+                          return (
+                            <code className="bg-gray-200 text-gray-800 px-1 py-0.5 rounded text-xs" {...restProps}>
+                              {children}
+                            </code>
+                          )
+                        }
+                        return (
+                          <code className={`block bg-gray-800 text-gray-100 p-2 rounded text-xs overflow-x-auto ${className}`} {...restProps}>
+                            {children}
+                          </code>
+                        )
+                      },
+                      // Handle pre elements properly
+                      pre: ({ node, children, ...props }) => {
+                        return <div className="my-2">{children}</div>
                       },
                       // Style links appropriately
                       a: ({ node, children, ...props }) => (
@@ -333,7 +345,7 @@ export default function ChatWindow({ chatId, initialPrompt, isCreatingChat, chat
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Type your message..."
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 resize-none"
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 text-gray-800 resize-none"
             rows={2}
           />
           <button
