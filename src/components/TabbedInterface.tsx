@@ -35,8 +35,10 @@ export default function TabbedInterface({ chatId, chatData, messages = [] }: Tab
 
   // Environment variables state
   const [envVars, setEnvVars] = useState<Array<{ key: string; value: string; id: string }>>([
-    { id: '1', key: 'API_KEY', value: '' },
-    { id: '2', key: 'DATABASE_URL', value: '' }
+    { id: '1', key: 'API_KEY', value: 'example' },
+    { id: '2', key: 'API_KEY', value: 'example' },
+    { id: '3', key: 'API_KEY', value: 'example' },
+    { id: '4', key: 'API_KEY', value: 'example' }
   ])
 
   // Terminal state
@@ -437,73 +439,78 @@ export default function TabbedInterface({ chatId, chatData, messages = [] }: Tab
     },
     {
       id: 'env-vars',
-      name: 'Environment Variables',
+      name: 'Environmental Variables',
       content: (
         <div className="p-6">
           <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Environment Variables</h3>
-            <div className="flex space-x-3">
+            <div className="flex items-center space-x-2">
+              <h3 className="text-lg font-semibold text-gray-900">Environmental Variables</h3>
+              <div className="bg-gray-100 rounded-full p-1">
+                <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+            <div className="flex items-center space-x-3">
               <button
                 onClick={addEnvVar}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm font-medium transition-colors"
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
               >
-                Add Variable
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
               </button>
               <button
                 onClick={saveEnvVars}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors"
+                className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-md text-sm font-medium transition-colors"
               >
                 Save All
               </button>
             </div>
           </div>
           
-          <div className="space-y-4">
-            {envVars.map((envVar) => (
-              <div key={envVar.id} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-                <div className="flex-1">
+          <div className="space-y-3">
+            {envVars.map((envVar, index) => (
+              <div key={envVar.id} className="grid grid-cols-2 gap-4 items-center">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Variable Name:</label>
                   <input
                     type="text"
-                    placeholder="Variable name (e.g., API_KEY)"
+                    placeholder="e.g, API_KEY"
                     value={envVar.key}
                     onChange={(e) => updateEnvVar(envVar.id, 'key', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-600 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                   />
                 </div>
-                <div className="flex-1">
-                  <input
-                    type="text"
-                    placeholder="Variable value"
-                    value={envVar.value}
-                    onChange={(e) => updateEnvVar(envVar.id, 'value', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
-                  />
+                <div className="relative">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Variable Value:</label>
+                  <div className="flex items-center">
+                    <input
+                      type="text"
+                      placeholder="e.g, example"
+                      value={envVar.value}
+                      onChange={(e) => updateEnvVar(envVar.id, 'value', e.target.value)}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-600 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    />
+                    <button
+                      onClick={() => removeEnvVar(envVar.id)}
+                      className="ml-3 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => removeEnvVar(envVar.id)}
-                  className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium transition-colors"
-                >
-                  Remove
-                </button>
               </div>
             ))}
             
             {envVars.length === 0 && (
               <div className="text-center py-8 text-gray-500">
                 <p>No environment variables configured.</p>
-                <p className="text-sm mt-1">Click "Add Variable" to get started.</p>
+                <p className="text-sm mt-1">Click the + button to get started.</p>
               </div>
             )}
-          </div>
-          
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-            <h4 className="text-sm font-medium text-blue-900 mb-2">Usage Instructions:</h4>
-            <ul className="text-sm text-blue-700 space-y-1">
-              <li>• Add environment variables that your application needs</li>
-              <li>• Use descriptive names like API_KEY, DATABASE_URL, etc.</li>
-              <li>• Values will be securely stored and available to your application</li>
-              <li>• Click "Save All" to persist your changes</li>
-            </ul>
           </div>
         </div>
       )
