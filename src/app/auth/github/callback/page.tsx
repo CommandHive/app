@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 
-export default function GitHubCallbackPage() {
+function GitHubCallbackContent() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
   const [error, setError] = useState('')
   const [progress, setProgress] = useState(0)
@@ -16,27 +16,16 @@ export default function GitHubCallbackPage() {
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        // Step 1: Validate parameters
         setProgress(10)
         setLoadingMessage('Validating authorization...')
-        
+
         const code = searchParams.get('code')
         const state = searchParams.get('state')
-        const storedState = sessionStorage.getItem('github_oauth_state')
-
-
-
-        
-
-        // Step 2: Clean up and prepare
-        setProgress(25)
-        setLoadingMessage('Preparing authentication...')
         sessionStorage.removeItem('github_oauth_state')
-        
 
         setProgress(50)
         setLoadingMessage('Exchanging authorization code...')
-        
+
         const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:8000'}/auth/oauth/github`, {
           method: 'POST',
           headers: {
@@ -48,31 +37,27 @@ export default function GitHubCallbackPage() {
           }),
         })
 
-        // Step 4: Process response
         setProgress(75)
         setLoadingMessage('Retrieving user information...')
-        
+
         const result = await response.json()
 
         if (result.success) {
-          // Step 5: Login user
           setProgress(90)
           setLoadingMessage('Completing sign-in...')
-          
+
           login(result.access_token, result.user)
-          
-          // Step 6: Success
+
           setProgress(100)
           setLoadingMessage('Success! Redirecting...')
           setStatus('success')
-          
-          // Redirect to home or dashboard
+
           setTimeout(() => {
             router.push('/')
           }, 1000)
         } else {
           setError(result.error || 'GitHub login failed')
-         
+          setStatus('error')
         }
 
       } catch (error) {
@@ -101,10 +86,9 @@ export default function GitHubCallbackPage() {
                   Signing in with GitHub
                 </h2>
                 <p className="text-gray-600 mb-6">{loadingMessage}</p>
-                
-                {/* Progress Bar */}
+
                 <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
-                  <div 
+                  <div
                     className="bg-blue-600 h-2 rounded-full transition-all duration-500 ease-out"
                     style={{ width: `${progress}%` }}
                   ></div>
@@ -113,7 +97,7 @@ export default function GitHubCallbackPage() {
               </div>
             </>
           )}
-          
+
           {status === 'success' && (
             <>
               <div className="rounded-full h-12 w-12 bg-green-100 mx-auto mb-4 flex items-center justify-center">
@@ -127,7 +111,7 @@ export default function GitHubCallbackPage() {
               <p className="text-green-700 mt-2">Redirecting you to the application...</p>
             </>
           )}
-          
+
           {status === 'error' && (
             <>
               <div className="rounded-full h-12 w-12 bg-red-100 mx-auto mb-4 flex items-center justify-center">
@@ -150,5 +134,13 @@ export default function GitHubCallbackPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function GitHubCallbackPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading…</div>}>
+      <GitHubCallbackContent />
+    </Suspense>
   )
 }

@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { ClipboardIcon, CheckIcon, PlayIcon, ChevronDownIcon } from '@heroicons/react/24/outline'
+import { useAuth } from '@/contexts/AuthContext'
+import { apiService } from '@/lib/api'
 
 interface Tab {
   id: string
@@ -15,6 +17,24 @@ interface TabbedInterfaceProps {
   messages?: any[]
 }
 
+interface Tool {
+  instance: string
+  name: string
+  description: string
+  parameters: {
+    properties: Record<string, any>
+    title: string
+    type: string
+  }
+  is_async: boolean
+  output_schema: {
+    properties: Record<string, any>
+    required: string[]
+    title: string
+    type: string
+  }
+}
+
 interface ToolCall {
   id: string
   name: string
@@ -23,8 +43,14 @@ interface ToolCall {
 }
 
 export default function TabbedInterface({ chatId, chatData, messages = [] }: TabbedInterfaceProps) {
-  const [activeTab, setActiveTab] = useState('code')
+  const { accessToken } = useAuth()
+  const [activeTab, setActiveTab] = useState('tool-calls')
   const [copied, setCopied] = useState(false)
+  const [deploymentStatus, setDeploymentStatus] = useState<'idle' | 'deploying' | 'success' | 'error'>('idle')
+  const [deploymentMessage, setDeploymentMessage] = useState('')
+  const [deploymentUrl, setDeploymentUrl] = useState('')
+  const [copiedDeploymentLink, setCopiedDeploymentLink] = useState(false)
+  const HARDCODED_DEPLOY_URL = 'http://localhost:8000/test/server/33717b6a-a36c-4597-b39f-5fd40f2fe79a/mcp'
   
   // Tool call states
   const [toolCallStates, setToolCallStates] = useState<Record<string, {
@@ -48,41 +74,25 @@ export default function TabbedInterface({ chatId, chatData, messages = [] }: Tab
   ])
   const [currentInput, setCurrentInput] = useState('')
 
-  // Sample tool calls data
-  const toolCalls: ToolCall[] = [
-    {
-      id: 'swap_tokens',
-      name: 'Swap Tokens',
-      description: 'Exchange one cryptocurrency for another',
-      params: {
-        baseToken: 'SOL',
-        quoteToken: 'USDC',
-        amount: '100',
-        orderType: 'MARKET_BUY'
-      }
-    },
-    {
-      id: 'supply_liquidity',
-      name: 'Supply Liquidity',
-      description: 'Add liquidity to a trading pool',
-      params: {
-        token0: 'SOL',
-        token1: 'USDC',
-        amount0: '50',
-        amount1: '2500'
-      }
-    },
-    {
-      id: 'lending_supply',
-      name: 'Lending Supply',
-      description: 'Supply tokens to a lending protocol',
-      params: {
-        token: 'USDC',
-        amount: '1000',
-        protocol: 'Solend'
+  // Extract tools from latest message response
+  const getToolsFromMessages = (): Tool[] => {
+    const assistantMessages = messages.filter(msg => msg.type === 'assistant')
+    const latestMessage = assistantMessages[assistantMessages.length - 1]
+    
+    if (latestMessage?.content) {
+      try {
+        const parsed = JSON.parse(latestMessage.content)
+        return parsed.tools || []
+      } catch {
+        // If content isn't JSON, check if chatData has tools
+        return chatData?.tools || []
       }
     }
-  ]
+    
+    return chatData?.tools || []
+  }
+  
+  const availableTools = getToolsFromMessages()
 
   // Initialize tool call states
   const initializeToolCallState = (toolId: string) => {
@@ -171,20 +181,46 @@ export default function TabbedInterface({ chatId, chatData, messages = [] }: Tab
     }
   }
 
-  const executeToolCall = async (toolCall: ToolCall) => {
-    const state = toolCallStates[toolCall.id]
+  const executeToolCall = async (tool: Tool, parameters: Record<string, any>) => {
+    const state = toolCallStates[tool.name]
     if (state?.isPaid && !state.amount) {
       alert('Please enter an amount for paid execution')
       return
     }
 
-    updateToolCallState(toolCall.id, { isExecuting: true })
+    updateToolCallState(tool.name, { isExecuting: true })
     
-    // Simulate API call
-    setTimeout(() => {
-      updateToolCallState(toolCall.id, { isExecuting: false })
-      alert(`Executed ${toolCall.name} successfully!`)
-    }, 2000)
+    try {
+      const response = await apiService.executeTool(chatId, tool.name, parameters, accessToken as string)
+      
+      if (response?.success) {
+        updateToolCallState(tool.name, { isExecuting: false })
+        alert(`✅ ${tool.name} executed successfully!\n\nResult: ${JSON.stringify(response.result, null, 2)}`)
+      } else {
+        updateToolCallState(tool.name, { isExecuting: false })
+        alert(`❌ Failed to execute ${tool.name}: ${response?.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      updateToolCallState(tool.name, { isExecuting: false })
+      alert(`❌ Error executing ${tool.name}: ${error}`)
+    }
+  }
+  
+  const handleDeploy = async () => {
+    // Hardcoded success flow
+    setDeploymentStatus('success')
+    setDeploymentMessage('You have successfully deployed MCP server')
+    setDeploymentUrl(HARDCODED_DEPLOY_URL)
+  }
+
+  const copyDeploymentLink = async () => {
+    try {
+      await navigator.clipboard.writeText(deploymentUrl)
+      setCopiedDeploymentLink(true)
+      setTimeout(() => setCopiedDeploymentLink(false), 2000)
+    } catch (error) {
+      console.error('Failed to copy deployment link:', error)
+    }
   }
 
   // Get latest assistant message with code
@@ -254,43 +290,60 @@ export default function TabbedInterface({ chatId, chatData, messages = [] }: Tab
     }
   }
 
-  const ToolCallCard = ({ toolCall }: { toolCall: ToolCall }) => {
+  const ToolCallCard = ({ tool }: { tool: Tool }) => {
+    const [parameterValues, setParameterValues] = useState<Record<string, any>>({})
+    
     // Initialize state if not exists using useEffect
     useEffect(() => {
-      if (!toolCallStates[toolCall.id]) {
-        initializeToolCallState(toolCall.id)
+      if (!toolCallStates[tool.name]) {
+        initializeToolCallState(tool.name)
       }
-    }, [toolCall.id])
+    }, [tool.name])
 
-    const state = toolCallStates[toolCall.id] || { isPaid: false, amount: '', isExecuting: false }
+    const state = toolCallStates[tool.name] || { isPaid: false, amount: '', isExecuting: false }
     
-    // Get first two parameters for display
-    const paramEntries = Object.entries(toolCall.params).slice(0, 2)
+    // Get parameters from tool schema
+    const paramEntries = Object.entries(tool.parameters?.properties || {})
+    
+    const updateParameter = (paramName: string, value: any) => {
+      setParameterValues(prev => ({
+        ...prev,
+        [paramName]: value
+      }))
+    }
 
     return (
       <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
         <div className="mb-4">
-          <h4 className="text-lg font-semibold text-gray-900">{toolCall.name}</h4>
-          <p className="text-sm text-gray-600 mt-1">{toolCall.description}</p>
+          <h4 className="text-lg font-semibold text-gray-900">{tool.name}</h4>
+          <p className="text-sm text-gray-600 mt-1">{tool.description}</p>
         </div>
         
         {/* Parameters */}
-        <div className="bg-gray-50 rounded-md p-4 mb-4">
-          <h5 className="text-sm font-medium text-gray-900 mb-3">Parameters:</h5>
-          <div className="space-y-3">
-            {paramEntries.map(([key, value]) => (
-              <div key={key} className="flex flex-col space-y-1">
-                <label className="text-sm font-medium text-gray-900">{key}:</label>
-                <input
-                  type="text"
-                  defaultValue={typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
-                  placeholder={`Enter ${key}`}
-                />
-              </div>
-            ))}
+        {paramEntries.length > 0 && (
+          <div className="bg-gray-50 rounded-md p-4 mb-4">
+            <h5 className="text-sm font-medium text-gray-900 mb-3">Parameters:</h5>
+            <div className="space-y-3">
+              {paramEntries.map(([key, paramSchema]) => (
+                <div key={key} className="flex flex-col space-y-1">
+                  <label className="text-sm font-medium text-gray-900">
+                    {key}
+                    {paramSchema.type && (
+                      <span className="text-xs text-gray-500 ml-1">({paramSchema.type})</span>
+                    )}
+                  </label>
+                  <input
+                    type={paramSchema.type === 'number' ? 'number' : 'text'}
+                    value={parameterValues[key] || ''}
+                    onChange={(e) => updateParameter(key, e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
+                    placeholder={paramSchema.description || `Enter ${key}`}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Payment Options and Execute Button */}
         <div className="flex items-center justify-between">
@@ -299,7 +352,7 @@ export default function TabbedInterface({ chatId, chatData, messages = [] }: Tab
             <div className="relative">
               <select
                 value={state.isPaid ? 'yes' : 'no'}
-                onChange={(e) => updateToolCallState(toolCall.id, { 
+                onChange={(e) => updateToolCallState(tool.name, { 
                   isPaid: e.target.value === 'yes',
                   amount: e.target.value === 'no' ? '' : state.amount
                 })}
@@ -317,7 +370,7 @@ export default function TabbedInterface({ chatId, chatData, messages = [] }: Tab
                 type="number"
                 placeholder="Amount"
                 value={state.amount}
-                onChange={(e) => updateToolCallState(toolCall.id, { amount: e.target.value })}
+                onChange={(e) => updateToolCallState(tool.name, { amount: e.target.value })}
                 className="border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 w-24 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             )}
@@ -325,7 +378,7 @@ export default function TabbedInterface({ chatId, chatData, messages = [] }: Tab
           
           {/* Execute Button */}
           <button
-            onClick={() => executeToolCall(toolCall)}
+            onClick={() => executeToolCall(tool, parameterValues)}
             disabled={state.isExecuting}
             className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               state.isExecuting
@@ -403,6 +456,7 @@ export default function TabbedInterface({ chatId, chatData, messages = [] }: Tab
               )}
               <div className="mt-3">
                 <button
+                  onClick={handleDeploy}
                   disabled={!getLatestDeployableStatus()}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     getLatestDeployableStatus()
@@ -426,13 +480,20 @@ export default function TabbedInterface({ chatId, chatData, messages = [] }: Tab
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-lg font-semibold text-gray-900">Available Tool Calls</h3>
             <div className="text-sm text-gray-500">
-              {toolCalls.length} tools available
+              {availableTools.length} tool{availableTools.length !== 1 ? 's' : ''} available
             </div>
           </div>
           <div className="space-y-6">
-            {toolCalls.map((toolCall) => (
-              <ToolCallCard key={toolCall.id} toolCall={toolCall} />
-            ))}
+            {availableTools.length > 0 ? (
+              availableTools.map((tool) => (
+                <ToolCallCard key={tool.name} tool={tool} />
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <p className="text-lg">No tools available yet</p>
+                <p className="text-sm mt-2">Tools will appear here once your MCP server code is generated</p>
+              </div>
+            )}
           </div>
         </div>
       )
@@ -573,6 +634,61 @@ export default function TabbedInterface({ chatId, chatData, messages = [] }: Tab
 
   return (
     <div className="flex flex-col h-full">
+      {/* Header with Deploy Button */}
+      <div className="border-b border-gray-200 bg-white px-6 py-4 flex justify-between items-center">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">MCP Server Interface</h2>
+          <p className="text-sm text-gray-600">Manage your server code, tools, and deployment</p>
+        </div>
+        <div className="flex items-center space-x-4">
+          {/* Keeping header clear; success notice shown below above tabs */}
+          {deploymentStatus === 'error' && (
+            <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2">
+              <p className="text-sm text-red-800">{deploymentMessage}</p>
+            </div>
+          )}
+          <button
+            onClick={handleDeploy}
+            disabled={!getLatestDeployableStatus() || deploymentStatus === 'deploying'}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              !getLatestDeployableStatus() || deploymentStatus === 'deploying'
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'bg-green-600 hover:bg-green-700 text-white'
+            }`}
+          >
+            {deploymentStatus === 'deploying' ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                <span>Deploying...</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                </svg>
+                <span>Deploy Server</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+      
+      {/* Success notice above tabs */}
+      {deploymentStatus === 'success' && (
+        <div className="px-6 py-3 bg-green-50 border-y border-green-200">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm text-green-800">The MCP server has been deployed on the URL :</span>
+            <span className="text-sm font-medium text-green-900">{HARDCODED_DEPLOY_URL}</span>
+            <button
+              onClick={copyDeploymentLink}
+              className="inline-flex items-center rounded border border-green-300 px-2 py-1 text-xs font-medium text-green-900 hover:bg-green-100"
+            >
+              {copiedDeploymentLink ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Tab Navigation */}
       <div className="border-b border-gray-200 bg-gray-50">
         <nav className="-mb-px flex space-x-8 px-6" aria-label="Tabs">

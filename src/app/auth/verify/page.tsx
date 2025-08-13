@@ -1,10 +1,10 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 
-export default function VerifyPage() {
+function VerifyPageContent() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
   const [error, setError] = useState('')
   const router = useRouter()
@@ -14,7 +14,7 @@ export default function VerifyPage() {
   useEffect(() => {
     const verifyToken = async () => {
       const token = searchParams.get('token')
-      
+
       if (!token) {
         setStatus('error')
         setError('No verification token provided')
@@ -23,10 +23,9 @@ export default function VerifyPage() {
 
       try {
         const result = await verifyMagicLink(token)
-        
+
         if (result.success) {
           setStatus('success')
-          // Redirect to dashboard after successful verification
           setTimeout(() => {
             router.push('/')
           }, 2000)
@@ -43,7 +42,6 @@ export default function VerifyPage() {
     verifyToken()
   }, [searchParams, verifyMagicLink, router])
 
-  // If already authenticated, redirect
   useEffect(() => {
     if (isAuthenticated) {
       router.push('/')
@@ -91,7 +89,7 @@ export default function VerifyPage() {
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Verification Failed</h2>
           <p className="text-gray-600 mb-4">{error}</p>
           <p className="text-sm text-gray-500 mb-6">The magic link may have expired or been used already.</p>
-          
+
           <button
             onClick={() => router.push('/auth')}
             className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -104,4 +102,12 @@ export default function VerifyPage() {
   }
 
   return null
+}
+
+export default function VerifyPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading…</div>}>
+      <VerifyPageContent />
+    </Suspense>
+  )
 }

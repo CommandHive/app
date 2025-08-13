@@ -316,6 +316,52 @@ class ApiService {
       localStorage.removeItem('jwt_token')
     }
   }
+
+  // Execute a tool from a chat session
+  async executeTool(chatId: string, toolName: string, parameters: Record<string, any>, token: string): Promise<any> {
+    try {
+      console.log('API executeTool - calling backend')
+      
+      const response = await this.makeAuthenticatedRequest(`${API_BASE_URL}/chat/${chatId}/tools/${toolName}/execute`, {
+        method: 'POST',
+        headers: this.getAuthHeaders(token),
+        body: JSON.stringify({ parameters }),
+      }, token)
+
+      if (!response.ok) {
+        console.error('API executeTool - failed:', response.status)
+        return null
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error('API executeTool - error:', error)
+      return null
+    }
+  }
+
+  // Deploy a chat server
+  async deployChatServer(chatId: string, token: string): Promise<any> {
+    try {
+      console.log('API deployChatServer - calling backend')
+      
+      const response = await this.makeAuthenticatedRequest(`${API_BASE_URL}/chat/${chatId}/deploy`, {
+        method: 'POST',
+        headers: this.getAuthHeaders(token),
+        body: JSON.stringify({}),
+      }, token)
+
+      if (!response.ok) {
+        console.error('API deployChatServer - failed:', response.status)
+        return null
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error('API deployChatServer - error:', error)
+      return null
+    }
+  }
 }
 
 export const apiService = new ApiService()
