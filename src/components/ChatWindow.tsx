@@ -15,6 +15,7 @@ interface ChatMessage {
   next_steps?: string
   is_deployable?: boolean
   timestamp: Date
+  tools?: any[]
 }
 
 interface ChatWindowProps {
@@ -77,7 +78,8 @@ export default function ChatWindow({ chatId, initialPrompt, isCreatingChat, chat
             code: msg.code,
             next_steps: msg.next_steps,
             is_deployable: msg.is_deployable,
-            timestamp: new Date(msg.timestamp || msg.created_at || Date.now())
+            timestamp: new Date(msg.timestamp || msg.created_at || Date.now()),
+            tools: msg.tools || []
           }))
           setLocalMessages(fetchedMessages)
         } else {
@@ -182,7 +184,8 @@ export default function ChatWindow({ chatId, initialPrompt, isCreatingChat, chat
           code: response.code,
           next_steps: response.next_steps,
           is_deployable: response.is_deployable,
-          timestamp: new Date()
+          timestamp: new Date(),
+          tools: response.tools || []
         }
         setMessages(prev => [...prev, assistantMessage])
       } else {

@@ -57,6 +57,7 @@ export default function TabbedInterface({ chatId, chatData, messages = [] }: Tab
     isPaid: boolean
     amount: string
     isExecuting: boolean
+    result: { success: boolean; message: string; data?: any } | null
   }>>({})
 
   // Environment variables state
@@ -74,22 +75,45 @@ export default function TabbedInterface({ chatId, chatData, messages = [] }: Tab
   ])
   const [currentInput, setCurrentInput] = useState('')
 
-  // Extract tools from latest message response
+  // Extract tools from API response or messages
   const getToolsFromMessages = (): Tool[] => {
-    const assistantMessages = messages.filter(msg => msg.type === 'assistant')
-    const latestMessage = assistantMessages[assistantMessages.length - 1]
+    // First priority: Check tools directly from chatData (from /create API response)
+    if (chatData?.tools && Array.isArray(chatData.tools) && chatData.tools.length > 0) {
+      return chatData.tools
+    }
     
-    if (latestMessage?.content) {
-      try {
-        const parsed = JSON.parse(latestMessage.content)
-        return parsed.tools || []
-      } catch {
-        // If content isn't JSON, check if chatData has tools
-        return chatData?.tools || []
+    // Second priority: Check nested data.tools in chatData
+    if (chatData?.data?.tools && Array.isArray(chatData.data.tools) && chatData.data.tools.length > 0) {
+      return chatData.data.tools
+    }
+    
+    // Third priority: Extract from assistant messages (for existing chats)
+    const assistantMessages = messages.filter(msg => msg.type === 'assistant')
+    
+    // Check all assistant messages for tools, starting from the latest
+    for (let i = assistantMessages.length - 1; i >= 0; i--) {
+      const message = assistantMessages[i]
+      
+      // First check if message has tools directly in the tools field
+      if (message?.tools && Array.isArray(message.tools) && message.tools.length > 0) {
+        return message.tools
+      }
+      
+      // Fallback: try parsing content as JSON for backward compatibility
+      if (message?.content) {
+        try {
+          const parsed = JSON.parse(message.content)
+          if (parsed.tools && Array.isArray(parsed.tools) && parsed.tools.length > 0) {
+            return parsed.tools
+          }
+        } catch {
+          // Continue to next message if parsing fails
+        }
       }
     }
     
-    return chatData?.tools || []
+    // Fallback: return empty array
+    return []
   }
   
   const availableTools = getToolsFromMessages()
@@ -102,7 +126,8 @@ export default function TabbedInterface({ chatId, chatData, messages = [] }: Tab
         [toolId]: {
           isPaid: false,
           amount: '',
-          isExecuting: false
+          isExecuting: false,
+          result: null
         }
       }))
     }
@@ -194,15 +219,33 @@ export default function TabbedInterface({ chatId, chatData, messages = [] }: Tab
       const response = await apiService.executeTool(chatId, tool.name, parameters, accessToken as string)
       
       if (response?.success) {
-        updateToolCallState(tool.name, { isExecuting: false })
-        alert(`✅ ${tool.name} executed successfully!\n\nResult: ${JSON.stringify(response.result, null, 2)}`)
+        updateToolCallState(tool.name, { 
+          isExecuting: false,
+          result: {
+            success: true,
+            message: `${tool.name} executed successfully!`,
+            data: response.result
+          }
+        })
       } else {
-        updateToolCallState(tool.name, { isExecuting: false })
-        alert(`❌ Failed to execute ${tool.name}: ${response?.error || 'Unknown error'}`)
+        updateToolCallState(tool.name, { 
+          isExecuting: false,
+          result: {
+            success: false,
+            message: `Failed to execute ${tool.name}: ${response?.error || 'Unknown error'}`,
+            data: null
+          }
+        })
       }
     } catch (error) {
-      updateToolCallState(tool.name, { isExecuting: false })
-      alert(`❌ Error executing ${tool.name}: ${error}`)
+      updateToolCallState(tool.name, { 
+        isExecuting: false,
+        result: {
+          success: false,
+          message: `Error executing ${tool.name}: ${error}`,
+          data: null
+        }
+      })
     }
   }
   
@@ -300,7 +343,7 @@ export default function TabbedInterface({ chatId, chatData, messages = [] }: Tab
       }
     }, [tool.name])
 
-    const state = toolCallStates[tool.name] || { isPaid: false, amount: '', isExecuting: false }
+    const state = toolCallStates[tool.name] || { isPaid: false, amount: '', isExecuting: false, result: null }
     
     // Get parameters from tool schema
     const paramEntries = Object.entries(tool.parameters?.properties || {})
@@ -348,21 +391,7 @@ export default function TabbedInterface({ chatId, chatData, messages = [] }: Tab
         {/* Payment Options and Execute Button */}
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <span className="text-sm font-medium text-gray-900">Payment:</span>
-            <div className="relative">
-              <select
-                value={state.isPaid ? 'yes' : 'no'}
-                onChange={(e) => updateToolCallState(tool.name, { 
-                  isPaid: e.target.value === 'yes',
-                  amount: e.target.value === 'no' ? '' : state.amount
-                })}
-                className="appearance-none bg-white border border-gray-300 rounded-md px-3 py-2 pr-8 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="no">Free</option>
-                <option value="yes">Paid</option>
-              </select>
-              <ChevronDownIcon className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-            </div>
+            
             
             {/* Amount Input (conditional) */}
             {state.isPaid && (
@@ -399,6 +428,48 @@ export default function TabbedInterface({ chatId, chatData, messages = [] }: Tab
             )}
           </button>
         </div>
+        
+        {/* Result Display */}
+        {state.result && (
+          <div className={`mt-4 p-4 rounded-md border ${
+            state.result.success 
+              ? 'bg-green-50 border-green-200 text-green-800' 
+              : 'bg-red-50 border-red-200 text-red-800'
+          }`}>
+            <div className="flex items-start space-x-2">
+              <div className="flex-shrink-0">
+                {state.result.success ? (
+                  <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </div>
+              <div className="flex-1">
+                <h6 className="font-medium text-sm">{state.result.message}</h6>
+                {state.result.data && (
+                  <div className="mt-2">
+                    <div className="text-xs font-medium mb-1">Response Data:</div>
+                    <pre className="text-xs bg-gray-900 text-green-400 p-2 rounded overflow-x-auto font-mono">
+                      {JSON.stringify(state.result.data, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => updateToolCallState(tool.name, { result: null })}
+                className="flex-shrink-0 text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     )
   }

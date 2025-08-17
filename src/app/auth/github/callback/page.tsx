@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -9,18 +9,30 @@ function GitHubCallbackContent() {
   const [error, setError] = useState('')
   const [progress, setProgress] = useState(0)
   const [loadingMessage, setLoadingMessage] = useState('Connecting to GitHub...')
+  const [isProcessingSuccess, setIsProcessingSuccess] = useState(false)
+  const hasProcessed = useRef(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const { login } = useAuth()
 
   useEffect(() => {
     const handleCallback = async () => {
+      if (hasProcessed.current) return
+      hasProcessed.current = true
+
       try {
         setProgress(10)
         setLoadingMessage('Validating authorization...')
 
         const code = searchParams.get('code')
         const state = searchParams.get('state')
+
+        if (!code) {
+          setError('No authorization code received from GitHub')
+          setStatus('error')
+          return
+        }
+
         sessionStorage.removeItem('github_oauth_state')
 
         setProgress(50)
@@ -37,12 +49,19 @@ function GitHubCallbackContent() {
           }),
         })
 
+        if (!response.ok) {
+          setError(`GitHub OAuth error: Failed to authenticate (${response.status})`)
+          setStatus('error')
+          return
+        }
+
         setProgress(75)
         setLoadingMessage('Retrieving user information...')
 
         const result = await response.json()
 
         if (result.success) {
+          setIsProcessingSuccess(true)
           setProgress(90)
           setLoadingMessage('Completing sign-in...')
 
@@ -56,19 +75,23 @@ function GitHubCallbackContent() {
             router.push('/')
           }, 1000)
         } else {
-          setError(result.error || 'GitHub login failed')
-          setStatus('error')
+          if (!isProcessingSuccess) {
+            setError(result.error || 'GitHub login failed')
+            setStatus('error')
+          }
         }
 
       } catch (error) {
         console.error('GitHub OAuth error:', error)
-        setError('Failed to complete GitHub authentication')
-        setStatus('error')
+        if (!isProcessingSuccess) {
+          setError('Failed to complete GitHub authentication')
+          setStatus('error')
+        }
       }
     }
 
     handleCallback()
-  }, [searchParams, login, router])
+  }, [])
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">

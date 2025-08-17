@@ -15,6 +15,7 @@ interface ChatMessage {
   next_steps?: string
   is_deployable?: boolean
   timestamp: Date
+  tools?: any[]
 }
 
 export default function ChatPage() {
@@ -53,7 +54,8 @@ export default function ChatPage() {
             code: msg.code,
             next_steps: msg.next_steps,
             is_deployable: msg.is_deployable,
-            timestamp: new Date(msg.timestamp || msg.created_at || Date.now())
+            timestamp: new Date(msg.timestamp || msg.created_at || Date.now()),
+            tools: msg.tools || []
           }))
           setMessages(fetchedMessages)
         } else {
@@ -137,7 +139,7 @@ export default function ChatPage() {
           
           {/* Main Content - Tabbed Interface */}
           <div className="flex-1 bg-white">
-            <TabbedInterface chatId={chatId} messages={messages} />
+            <TabbedInterface chatId={chatId} messages={messages} chatData={null} />
           </div>
         </div>
       )}

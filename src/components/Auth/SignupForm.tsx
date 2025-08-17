@@ -44,7 +44,7 @@ export default function SignupForm({ onSwitchToLogin }: SignupFormProps) {
   }
 
   const handleGithubSignup = async () => {
-    const clientId = process.env.NEXT_PUBLIC_GITHUB_ID || '***REMOVED***'
+    const clientId = process.env.NEXT_PUBLIC_GITHUB_ID || 'a5ce13d3c38e31715e96'
     const redirectUri = `${window.location.origin}/auth/github/callback`
     const scope = 'user:email'
     const state = Math.random().toString(36).substring(2, 15)
