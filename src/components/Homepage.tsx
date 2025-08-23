@@ -1,14 +1,21 @@
 /* eslint-disable react/no-unescaped-entities */
-"use client"
+"use client";
 
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
-import Image from "next/image"
-import { Textarea } from "@/components/ui/textarea"
-import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ChevronDown } from "lucide-react"
-import { useAuth } from '@/contexts/AuthContext'
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ChevronDown } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { Dialog, DialogContent } from "./ui/dialog";
 
 const placeholderTexts = [
   "Describe the MCP server you want to create...",
@@ -17,201 +24,242 @@ const placeholderTexts = [
   "Create a monitoring and alerting system...",
   "Develop a file management solution...",
   "Build a database connection server...",
-]
+];
 
 const examplePrompts = [
   {
     id: 1,
     title: "Web Scraping Server",
-    description: "Create an MCP server that can scrape websites and extract structured data",
-    prompt: "Create a web scraping MCP server that can extract product information from e-commerce sites",
-    category: "Data Extraction"
+    description:
+      "Create an MCP server that can scrape websites and extract structured data",
+    prompt:
+      "Create a web scraping MCP server that can extract product information from e-commerce sites",
+    category: "Data Extraction",
   },
   {
     id: 2,
     title: "Database Query Server",
-    description: "Build an MCP server for executing SQL queries and database operations",
-    prompt: "Build an MCP server that connects to PostgreSQL and executes safe SQL queries",
-    category: "Database"
+    description:
+      "Build an MCP server for executing SQL queries and database operations",
+    prompt:
+      "Build an MCP server that connects to PostgreSQL and executes safe SQL queries",
+    category: "Database",
   },
   {
     id: 3,
     title: "File Management Server",
-    description: "Create an MCP server for file operations like reading, writing, and organizing files",
-    prompt: "Create a file management MCP server that can organize files by type and date",
-    category: "File System"
+    description:
+      "Create an MCP server for file operations like reading, writing, and organizing files",
+    prompt:
+      "Create a file management MCP server that can organize files by type and date",
+    category: "File System",
   },
   {
     id: 4,
     title: "API Integration Server",
-    description: "Build an MCP server that integrates with external APIs and services",
-    prompt: "Build an MCP server that integrates with GitHub API for repository management",
-    category: "API Integration"
+    description:
+      "Build an MCP server that integrates with external APIs and services",
+    prompt:
+      "Build an MCP server that integrates with GitHub API for repository management",
+    category: "API Integration",
   },
   {
     id: 5,
     title: "Email Processing Server",
-    description: "Create an MCP server for sending, receiving, and processing emails",
-    prompt: "Create an email processing MCP server that can send notifications and parse attachments",
-    category: "Communication"
+    description:
+      "Create an MCP server for sending, receiving, and processing emails",
+    prompt:
+      "Create an email processing MCP server that can send notifications and parse attachments",
+    category: "Communication",
   },
   {
     id: 6,
     title: "Image Processing Server",
     description: "Build an MCP server for image manipulation and analysis",
-    prompt: "Build an image processing MCP server that can resize, compress, and analyze images",
-    category: "Media Processing"
+    prompt:
+      "Build an image processing MCP server that can resize, compress, and analyze images",
+    category: "Media Processing",
   },
-]
+];
 
 const HomePage = () => {
   // Authentication logic from old code
-  const { accessToken: sessionToken, isAuthenticated, user: session } = useAuth()
-  const [localStorageToken, setLocalStorageToken] = useState<string | null>(null)
-  const [isCreatingChat, setIsCreatingChat] = useState(false)
-  const [selectedExample, setSelectedExample] = useState<number | null>(null)
-  const router = useRouter()
+  const {
+    accessToken: sessionToken,
+    isAuthenticated,
+    user: session,
+  } = useAuth();
+  const [localStorageToken, setLocalStorageToken] = useState<string | null>(
+    null
+  );
+  const [isCreatingChat, setIsCreatingChat] = useState(false);
+  const [selectedExample, setSelectedExample] = useState<number | null>(null);
+  const router = useRouter();
 
   // UI state from new code
-  const [currentPlaceholderIndex, setCurrentPlaceholderIndex] = useState(0)
-  const [displayedText, setDisplayedText] = useState("")
-  const [isTyping, setIsTyping] = useState(true)
-  const [isFocused, setIsFocused] = useState(false)
-  const [hasUserInput, setHasUserInput] = useState(false)
-  const typewriterRef = useRef<NodeJS.Timeout | null>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const [inputValue, setInputValue] = useState("")
+  const [currentPlaceholderIndex, setCurrentPlaceholderIndex] = useState(0);
+  const [displayedText, setDisplayedText] = useState("");
+  const [isTyping, setIsTyping] = useState(true);
+  const [isFocused, setIsFocused] = useState(false);
+  const [hasUserInput, setHasUserInput] = useState(false);
+  const typewriterRef = useRef<NodeJS.Timeout | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [inputValue, setInputValue] = useState("");
+  const [showVideoModal, setShowVideoModal] = useState(false);
 
   // Authentication check from old code
   useEffect(() => {
-    console.log('🏠 [Homepage] ===== HOMEPAGE USEEFFECT TRIGGERED =====')
-    const sessionTokenStored = localStorage.getItem('session_token')
-    const jwtToken = localStorage.getItem('jwt_token')
-    console.log('🏠 [Homepage] localStorage session_token found:', !!sessionTokenStored)
-    console.log('🏠 [Homepage] localStorage jwt_token found:', !!jwtToken)
-    console.log('🏠 [Homepage] sessionToken from hook:', !!sessionToken)
-    console.log('🏠 [Homepage] sessionToken (first 20 chars):', sessionToken ? sessionToken.substring(0, 20) + '...' : 'NO TOKEN')
-    setLocalStorageToken(sessionTokenStored || jwtToken)
-  }, [sessionToken])
+    console.log("🏠 [Homepage] ===== HOMEPAGE USEEFFECT TRIGGERED =====");
+    const sessionTokenStored = localStorage.getItem("session_token");
+    const jwtToken = localStorage.getItem("jwt_token");
+    console.log(
+      "🏠 [Homepage] localStorage session_token found:",
+      !!sessionTokenStored
+    );
+    console.log("🏠 [Homepage] localStorage jwt_token found:", !!jwtToken);
+    console.log("🏠 [Homepage] sessionToken from hook:", !!sessionToken);
+    console.log(
+      "🏠 [Homepage] sessionToken (first 20 chars):",
+      sessionToken ? sessionToken.substring(0, 20) + "..." : "NO TOKEN"
+    );
+    setLocalStorageToken(sessionTokenStored || jwtToken);
+  }, [sessionToken]);
 
   // Search/Create functionality from old code
   const handleSearch = async () => {
-    console.log('🔍 [Homepage.handleSearch] ===== HANDLE SEARCH CALLED =====')
-    console.log('🔍 [Homepage.handleSearch] Session object:', session)
-    console.log('🔍 [Homepage.handleSearch] Session keys:', session ? Object.keys(session) : 'no session')
-    console.log('🔍 [Homepage.handleSearch] sessionToken from hook:', sessionToken)
-    console.log('🔍 [Homepage.handleSearch] Search query:', inputValue)
-    console.log('🔍 [Homepage.handleSearch] isAuthenticated:', isAuthenticated)
-    console.log('🔍 [Homepage.handleSearch] localStorage token:', localStorageToken)
-    
-    // Check for session token first, then fall back to localStorage
-    const token = sessionToken || localStorageToken
-    console.log('🔍 [Homepage.handleSearch] Final token to use:', token ? token.substring(0, 20) + '...' : 'NO TOKEN')
-    
-    if (!token) {
-      console.log('❌ [Homepage.handleSearch] No session token available')
-      alert('Please sign in first to create a chat')
-      return
-    }
-    
-    if (!inputValue.trim()) {
-      console.log('No search query provided')
-      alert('Please enter a description for your MCP server')
-      return
-    }
-    
-    setIsCreatingChat(true)
-    
-    // Redirect immediately with the prompt in URL
-    const encodedPrompt = encodeURIComponent(inputValue)
-    const chatUrl = `/chat/new?prompt=${encodedPrompt}`
-    console.log('Redirecting to:', chatUrl)
-    router.push(chatUrl)
-  }
+    console.log("🔍 [Homepage.handleSearch] ===== HANDLE SEARCH CALLED =====");
+    console.log("🔍 [Homepage.handleSearch] Session object:", session);
+    console.log(
+      "🔍 [Homepage.handleSearch] Session keys:",
+      session ? Object.keys(session) : "no session"
+    );
+    console.log(
+      "🔍 [Homepage.handleSearch] sessionToken from hook:",
+      sessionToken
+    );
+    console.log("🔍 [Homepage.handleSearch] Search query:", inputValue);
+    console.log("🔍 [Homepage.handleSearch] isAuthenticated:", isAuthenticated);
+    console.log(
+      "🔍 [Homepage.handleSearch] localStorage token:",
+      localStorageToken
+    );
 
-  const handleExampleClick = (example: typeof examplePrompts[0]) => {
-    setInputValue(example.prompt)
-    setHasUserInput(true)
-    setSelectedExample(example.id)
-  }
+    // Check for session token first, then fall back to localStorage
+    const token = sessionToken || localStorageToken;
+    console.log(
+      "🔍 [Homepage.handleSearch] Final token to use:",
+      token ? token.substring(0, 20) + "..." : "NO TOKEN"
+    );
+
+    if (!token) {
+      console.log("❌ [Homepage.handleSearch] No session token available");
+      alert("Please sign in first to create a chat");
+      return;
+    }
+
+    if (!inputValue.trim()) {
+      console.log("No search query provided");
+      alert("Please enter a description for your MCP server");
+      return;
+    }
+
+    setIsCreatingChat(true);
+
+    // Redirect immediately with the prompt in URL
+    const encodedPrompt = encodeURIComponent(inputValue);
+    const chatUrl = `/chat/new?prompt=${encodedPrompt}`;
+    console.log("Redirecting to:", chatUrl);
+    router.push(chatUrl);
+  };
+
+  const handleExampleClick = (example: (typeof examplePrompts)[0]) => {
+    setInputValue(example.prompt);
+    setHasUserInput(true);
+    setSelectedExample(example.id);
+  };
 
   // Check authentication from session token hook and localStorage fallback
-  const hasToken = sessionToken || localStorageToken
-  const authenticatedState = isAuthenticated || hasToken
+  const hasToken = sessionToken || localStorageToken;
+  const authenticatedState = isAuthenticated || hasToken;
 
   // Typewriter effect from new code
   const startTypewriter = useCallback(() => {
     if (isFocused || hasUserInput) {
-      setDisplayedText("")
-      setIsTyping(false)
-      return
+      setDisplayedText("");
+      setIsTyping(false);
+      return;
     }
 
-    const currentText = placeholderTexts[currentPlaceholderIndex]
-    let charIndex = 0
-    setDisplayedText("")
-    setIsTyping(true)
+    const currentText = placeholderTexts[currentPlaceholderIndex];
+    let charIndex = 0;
+    setDisplayedText("");
+    setIsTyping(true);
 
     const typeCharacter = () => {
       if (isFocused || hasUserInput) {
-        setDisplayedText("")
-        setIsTyping(false)
-        return
+        setDisplayedText("");
+        setIsTyping(false);
+        return;
       }
 
       if (charIndex < currentText.length) {
-        setDisplayedText(currentText.slice(0, charIndex + 1))
-        charIndex++
-        typewriterRef.current = setTimeout(typeCharacter, 50)
+        setDisplayedText(currentText.slice(0, charIndex + 1));
+        charIndex++;
+        typewriterRef.current = setTimeout(typeCharacter, 50);
       } else {
-        setIsTyping(false)
+        setIsTyping(false);
         typewriterRef.current = setTimeout(() => {
-          setCurrentPlaceholderIndex((prev) => (prev + 1) % placeholderTexts.length)
-        }, 2000)
+          setCurrentPlaceholderIndex(
+            (prev) => (prev + 1) % placeholderTexts.length
+          );
+        }, 2000);
       }
-    }
+    };
 
-    typeCharacter()
-  }, [currentPlaceholderIndex, isFocused, hasUserInput])
+    typeCharacter();
+  }, [currentPlaceholderIndex, isFocused, hasUserInput]);
 
   useEffect(() => {
     // Clear any existing timeout
     if (typewriterRef.current) {
-      clearTimeout(typewriterRef.current)
-      typewriterRef.current = null
+      clearTimeout(typewriterRef.current);
+      typewriterRef.current = null;
     }
 
-    startTypewriter()
+    startTypewriter();
 
     return () => {
       if (typewriterRef.current) {
-        clearTimeout(typewriterRef.current)
-        typewriterRef.current = null
+        clearTimeout(typewriterRef.current);
+        typewriterRef.current = null;
       }
-    }
-  }, [startTypewriter])
+    };
+  }, [startTypewriter]);
 
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value
-    setInputValue(value)
-    setHasUserInput(value.length > 0)
-  }, [])
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const value = e.target.value;
+      setInputValue(value);
+      setHasUserInput(value.length > 0);
+    },
+    []
+  );
 
   const handleFocus = useCallback(() => {
-    setIsFocused(true)
-  }, [])
+    setIsFocused(true);
+  }, []);
 
   const handleBlur = useCallback(() => {
-    setIsFocused(false)
-  }, [])
+    setIsFocused(false);
+  }, []);
 
   // Handle Enter key for search
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSearch()
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSearch();
     }
-  }
+  };
 
   return (
     <main className="w-[1217px] flex flex-col mx-auto gap-14 mb-10">
@@ -223,7 +271,8 @@ const HomePage = () => {
             <span className="text-orange-500">.</span>
           </h1>
           <p className="text-[16px] font-normal text-[#667085]">
-            Describe what you want to build and we&apos;ll generate an MCP server for you with full implementation and documentation.
+            Describe what you want to build and we&apos;ll generate an MCP
+            server for you with full implementation and documentation.
           </p>
         </div>
 
@@ -244,8 +293,12 @@ const HomePage = () => {
             />
             {inputValue.length === 0 && !isFocused && (
               <div className="absolute top-6 left-6 pointer-events-none text-gray-500 text-base">
-                <span className="transition-opacity duration-300">{displayedText}</span>
-                {isTyping && <span className="inline-block w-0.5 h-5 bg-orange-500 ml-1 animate-pulse"></span>}
+                <span className="transition-opacity duration-300">
+                  {displayedText}
+                </span>
+                {isTyping && (
+                  <span className="inline-block w-0.5 h-5 bg-orange-500 ml-1 animate-pulse"></span>
+                )}
               </div>
             )}
 
@@ -253,12 +306,12 @@ const HomePage = () => {
             <div className="absolute bottom-4 left-6 right-6 flex items-center justify-between gap-4">
               <div className="relative">
                 <Select defaultValue="claude-sonnet-4">
-                  <SelectTrigger className="w-[200px] h-9 bg-gray-50/80 backdrop-blur-sm border-gray-200/60 hover:bg-gray-100/80 transition-colors text-sm">
+                  <SelectTrigger className="w-[200px] h-9 bg-gray-50/80 backdrop-blur-sm border-gray-200/60 hover:bg-gray-100/80 transition-colors text-sm [&>svg]:hidden">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full animate-pulse"></div>
                       <SelectValue placeholder="Choose a model" />
+                      <ChevronDown className="w-3 h-3 transition-transform duration-200" />
                     </div>
-                    <ChevronDown className="w-3 h-3 transition-transform duration-200" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="claude-sonnet-4">
@@ -283,13 +336,15 @@ const HomePage = () => {
                 </Select>
               </div>
 
-              <Button 
+              <Button
                 onClick={handleSearch}
-                disabled={!authenticatedState || !inputValue.trim() || isCreatingChat}
+                disabled={
+                  !authenticatedState || !inputValue.trim() || isCreatingChat
+                }
                 className={`h-9 px-4 flex items-center gap-2 font-medium rounded-lg text-sm shadow-sm ${
                   authenticatedState && inputValue.trim() && !isCreatingChat
-                    ? 'bg-[#FDB022] hover:bg-[#FDB022]/90 text-[#101323]'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed hover:bg-gray-300'
+                    ? "bg-[#FDB022] hover:bg-[#FDB022]/90 text-[#101323]"
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed hover:bg-gray-300"
                 }`}
               >
                 {isCreatingChat ? (
@@ -300,7 +355,12 @@ const HomePage = () => {
                 ) : (
                   <>
                     Start Creating
-                    <Image src="/arrow-up-right.svg" alt="arrow-right" width={16} height={16} />
+                    <Image
+                      src="/arrow-up-right.svg"
+                      alt="arrow-right"
+                      width={16}
+                      height={16}
+                    />
                   </>
                 )}
               </Button>
@@ -319,8 +379,11 @@ const HomePage = () => {
       </div>
 
       {/* Demo Video Button */}
-      <div className="flex flex-col items-center gap-8">  
-        <button className="h-12 px-[18px] flex items-center gap-2 py-[10px] border-[#D0D5DD] w-[208px] border rounded-lg text-[#333F53] hover:bg-gray-50 bg-transparent">
+      <div className="flex flex-col items-center gap-8">
+        <Button
+          onClick={() => setShowVideoModal(true)}
+          className="h-12 px-6 lg:px-[18px] flex items-center gap-2 py-[10px] border-[#D0D5DD] w-full max-w-[208px] border rounded-lg text-[#333F53] hover:bg-gray-50 bg-transparent transition-colors"
+        >
           <Image
             src={"/play-icon.svg"}
             alt="play-icon"
@@ -328,20 +391,13 @@ const HomePage = () => {
             height={20}
           />
           Watch Demo Video
-        </button>
+        </Button>
 
         {/* Example Prompts Section */}
-        <div className="text-[#98A2B3] text-[14px] font-normal">
-          or
-        </div>
+        <div className="text-[#98A2B3] text-[14px] font-normal">or</div>
         <div className="text-center">
           <h2 className="text-[22px] font-medium text-gray-600 flex items-center gap-2">
-            <Image
-              src={"/sparkle.svg"}
-              alt="sparkle"
-              width={24}
-              height={24}
-            />
+            <Image src={"/sparkle.svg"} alt="sparkle" width={24} height={24} />
             Try our example prompts
           </h2>
         </div>
@@ -354,13 +410,15 @@ const HomePage = () => {
               onClick={() => handleExampleClick(example)}
               className={`bg-white rounded-lg p-[16px] hover:shadow-md transition-all cursor-pointer border-2 ${
                 selectedExample === example.id
-                  ? 'border-orange-500 bg-orange-50'
-                  : 'border-gray-100 hover:border-gray-300'
+                  ? "border-orange-500 bg-orange-50"
+                  : "border-gray-100 hover:border-gray-300"
               }`}
             >
               <div className="flex flex-col gap-2">
                 <div className="flex items-start justify-between">
-                  <h3 className="font-semibold text-[16px] text-black">{example.title}</h3>
+                  <h3 className="font-semibold text-[16px] text-black">
+                    {example.title}
+                  </h3>
                   <div className="bg-[#F2F4F7] text-[11px] font-medium flex items-center gap-2 text-gray-500 py-1 px-3 rounded-lg">
                     <Image
                       src={"/store-icon.svg"}
@@ -371,7 +429,9 @@ const HomePage = () => {
                     {example.category}
                   </div>
                 </div>
-                <p className="text-sm text-gray-700 opacity-90 leading-relaxed">{example.description}</p>
+                <p className="text-sm text-gray-700 opacity-90 leading-relaxed">
+                  {example.description}
+                </p>
                 <div className="text-xs text-orange-600 font-medium mt-1">
                   "{example.prompt}"
                 </div>
@@ -380,8 +440,25 @@ const HomePage = () => {
           ))}
         </div>
       </div>
-    </main>
-  )
-}
 
-export default HomePage
+      <Dialog open={showVideoModal} onOpenChange={setShowVideoModal}>
+        <DialogContent className="max-w-4xl w-full p-0 overflow-hidden">
+          <div className="relative w-full">
+            <iframe
+              width="560"
+              height="315"
+              src="https://www.youtube.com/embed/-CEYKr5pyh0?si=qEPGnjfJE0QsgaSN"
+              title="YouTube video player"
+              frameborder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              referrerpolicy="strict-origin-when-cross-origin"
+              allowfullscreen
+            ></iframe>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </main>
+  );
+};
+
+export default HomePage;

@@ -454,12 +454,12 @@ export default function ChatWindow({
           </div>
           <div className="flex items-center justify-between gap-2 w-full">
             <Select defaultValue="claude-sonnet-4">
-              <SelectTrigger className="w-[200px] h-9 bg-gray-50/80 backdrop-blur-sm border-gray-200/60 hover:bg-gray-100/80 transition-colors text-sm">
+              <SelectTrigger className="w-[200px] h-9 bg-gray-50/80 backdrop-blur-sm border-gray-200/60 hover:bg-gray-100/80 transition-colors text-sm [&>svg]:hidden">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full animate-pulse"></div>
                   <SelectValue placeholder="Choose a model" />
+                  <ChevronDown className="w-3 h-3 transition-transform duration-200" />
                 </div>
-                <ChevronDown className="w-3 h-3 transition-transform duration-200" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="claude-sonnet-4">
