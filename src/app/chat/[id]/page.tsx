@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client'
 
 import { useParams } from 'next/navigation'
@@ -6,6 +8,7 @@ import { useState, useEffect } from 'react'
 import ChatWindow from '@/components/ChatWindow'
 import TabbedInterface from '@/components/TabbedInterface'
 import { apiService } from '@/lib/api'
+import Image from "next/image"
 
 interface ChatMessage {
   id: string
@@ -24,6 +27,7 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoadingMessages, setIsLoadingMessages] = useState(true)
+  const [activeTab, setActiveTab] = useState("Generated Code")
   const chatId = params.id as string
 
   useEffect(() => {
@@ -87,6 +91,8 @@ export default function ChatPage() {
     )
   }
 
+  const tabs = ["Generated Code", "Tool Calls", "Environmental Variables", "Terminal", "MCP Proxy Servers"]
+
   return (
     <div className="min-h-screen bg-gray-50">
       {isLoading ? (
@@ -98,35 +104,26 @@ export default function ChatPage() {
           </div>
         </div>
       ) : (
-        <div className="flex h-screen bg-white">
-          {/* Left Sidebar - Project Info & Chat */}
-          <div className="w-80 border-r border-gray-200 bg-white flex flex-col">
-            {/* Project Header */}
-            <div className="p-4 border-b border-gray-200">
-              <div className="flex items-center space-x-2 mb-3">
-                <div className="w-6 h-6 bg-orange-500 rounded flex items-center justify-center">
-                  <span className="text-white text-xs font-bold">⬢</span>
-                </div>
-                <h2 className="font-semibold text-gray-900">Web scraping MCP</h2>
-                <div className="ml-auto">
-                  <button className="p-1 hover:bg-gray-100 rounded">
-                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zM12 13a1 1 0 110-2 1 1 0 010 2zM12 20a1 1 0 110-2 1 1 0 010 2z" />
-                    </svg>
-                  </button>
-                </div>
+        <div className="flex h-screen pt-[72px]">
+          {/* Left Chat Panel - Updated UI */}
+          <div className="fixed left-0 top-[72px] w-[491px] h-[calc(100vh-72px)] bg-[#F9FAFB] flex flex-col">
+            {/* Chat Header - Updated UI */}
+            <div className="px-4 py-[18px] flex justify-between items-center border-b border-gray-200">
+              <div className="flex items-center space-x-2">
+                
+                <span className="text-[16px] font-semibold text-gray-800">Web scraping MCP</span>
               </div>
-              
-              {/* Project Description */}
-              <div className="text-sm text-gray-600 space-y-2">
-                <div className="font-medium text-gray-900 mb-2">PostgreSQL database</div>
-                <p>You can use several secure tools to interact with your PostgreSQL database. For example, you can execute safe SELECT queries with automatic security validation.</p>
-                <p className="mt-2">There's a get_table_schema tool to retrieve detailed schema information for any table, and list_tables to list all tables within a schema.</p>
-                <p className="mt-2">If you'd like to analyze query execution without actually running the query, the get_query_plan function can help.</p>
-              </div>
+              <button>
+                <Image
+                  src={"/menudots.svg"}
+                  alt="dots-vertical"
+                  width={20}
+                  height={20}
+                />
+              </button>
             </div>
             
-            {/* Chat Window */}
+            {/* Chat Window - Original component with updated container */}
             <div className="flex-1 min-h-0">
               <ChatWindow 
                 chatId={chatId} 
@@ -137,9 +134,44 @@ export default function ChatPage() {
             </div>
           </div>
           
-          {/* Main Content - Tabbed Interface */}
-          <div className="flex-1 bg-white">
-            <TabbedInterface chatId={chatId} messages={messages} chatData={null} />
+          {/* Right Panel with Tabs - Updated UI */}
+          <div className="w-[calc(100%-491px)] overflow-x-hidden flex flex-col bg-[#EAECF04D] pr-[16px] ml-[491px]">
+            {/* Tab Header - Updated UI */}
+            <div className="border-b border-gray-200">
+              <div className="flex items-center">
+                {tabs.map((tab) => (
+                  <div key={tab} className="border-r border-gray-300 hover:bg-gray-200">  
+                    <button
+                      onClick={() => setActiveTab(tab)}
+                      className={`px-4 py-[16px] text-[16px] font-medium transition-colors ${
+                        activeTab === tab
+                          ? "border-gray-600 bg-gray-200 border-b-4 text-gray-600 font-semibold"
+                          : "border-transparent text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      {tab}
+                    </button>
+                  </div>
+                ))}
+                <div className="ml-auto">
+                  <button className="px-4 py-[10px] bg-[#FDB022] hover:bg-[#FDB022]/80 text-black text-[16px] font-semibold rounded-lg">
+                    Deploy
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Tab Content - Original TabbedInterface component */}
+            <div className="h-full">
+              <div className="h-full">
+                <TabbedInterface 
+                  chatId={chatId} 
+                  messages={messages} 
+                  chatData={null}
+                  activeTab={activeTab}
+                />
+              </div>
+            </div>
           </div>
         </div>
       )}
