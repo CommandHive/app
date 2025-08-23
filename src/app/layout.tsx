@@ -32,6 +32,14 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <div
+          className="fixed inset-0 -z-10"
+          style={{
+            backgroundImage: 'url(/background.svg)',
+            backgroundRepeat: 'repeat',
+            backgroundSize: 'contain'
+          }}
+        />
         <ClientSessionProvider>
           <Navbar />
           {children}

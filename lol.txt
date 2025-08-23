@@ -1,0 +1,18 @@
+from mcp.server.fastmcp import FastMCP
+
+hello_world_mcp = FastMCP(name="HelloWorldServer", stateless_http=True)
+
+@hello_world_mcp.tool()
+def hello_world() -> str:
+    "Return a simple hello world greeting."
+    return "Hello, World!"
+
+@hello_world_mcp.tool()
+def greet_user(name: str) -> str:
+    "Return a personalized greeting for the given name."
+    return f"Hello, {name}! Welcome to the MCP Server!"
+
+@hello_world_mcp.tool()
+def get_server_info() -> str:
+    "Return information about this MCP server."
+    return "This is a Hello World MCP Server with basic greeting functionality."

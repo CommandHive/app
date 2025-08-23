@@ -1,8 +1,16 @@
 'use client'
 
+import Image from "next/image";
 import { useAuth } from '@/contexts/AuthContext'
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
+import {
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+  } from "@/components/ui/select"
 
 interface LeaderboardEntry {
   id: string
@@ -198,44 +206,8 @@ const placeholderData: LeaderboardEntry[] = [
   },
   {
     id: '21',
-    name: 'Cryptocurrency Monitor',
-    description: 'Real-time crypto market analysis with portfolio tracking and alerts',
-    repoLink: 'https://github.com/crypto/monitor-mcp',
-    mcpServerLink: 'mcp://cryptocurrency-monitor.mcpserver.dev',
-    author: 'CryptoTrack Solutions',
-    totalEarnings: 1543.70
-  },
-  {
-    id: '22',
-    name: 'Educational Content Helper',
-    description: 'Curriculum development tools with adaptive learning algorithms',
-    repoLink: 'https://github.com/edutech/helper-mcp',
-    mcpServerLink: 'mcp://educational-content-helper.mcpserver.dev',
-    author: 'EduTech Innovations',
-    totalEarnings: 1432.55
-  },
-  {
-    id: '23',
-    name: 'Travel Planning Assistant',
-    description: 'Smart travel itinerary creation with cost optimization and local insights',
-    repoLink: 'https://github.com/travel/assistant-mcp',
-    mcpServerLink: 'mcp://travel-planning-assistant.mcpserver.dev',
-    author: 'TravelSmart Co',
-    totalEarnings: 1321.40
-  },
-  {
-    id: '24',
-    name: 'Legal Document Processor',
-    description: 'Automated legal document analysis and contract review system',
-    repoLink: 'https://github.com/legaltech/processor-mcp',
-    mcpServerLink: 'mcp://legal-document-processor.mcpserver.dev',
-    author: 'LegalAI Solutions',
-    totalEarnings: 1210.25
-  },
-  {
-    id: '25',
     name: 'Weather API Server',
-    description: 'Provides weather data and forecasts',
+    description: 'Provides weather data and forecasts for global locations',
     repoLink: 'https://github.com/current-user/weather-mcp',
     mcpServerLink: 'mcp://weather-api-server.mcpserver.dev',
     author: 'Current User',
@@ -247,12 +219,13 @@ const placeholderData: LeaderboardEntry[] = [
 // Sort by total earnings in descending order
 const sortedData = [...placeholderData].sort((a, b) => b.totalEarnings - a.totalEarnings)
 
-export default function Leaderboard() {
+const LeaderboardPage = () => {
   const { user, isAuthenticated } = useAuth()
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [userRank, setUserRank] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [copiedLink, setCopiedLink] = useState<string | null>(null)
+  const [timePeriod, setTimePeriod] = useState<string>('last30days')
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -277,6 +250,13 @@ export default function Leaderboard() {
     return link.length > 20 ? `${link.substring(0, 17)}...` : link
   }
 
+  const shortenDescription = (description: string) => {
+    if (description.length > 50) {
+      return `${description.substring(0, 47)}...`
+    }
+    return description
+  }
+
   useEffect(() => {
     // Simulate API call delay
     setTimeout(() => {
@@ -291,101 +271,182 @@ export default function Leaderboard() {
       }
       setLoading(false)
     }, 1000)
-  }, [isAuthenticated])
+  }, [isAuthenticated, timePeriod])
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading leaderboard...</p>
+      <main className="pt-[112px] flex justify-center mb-10">
+        <div className="max-w-[1216px] w-full flex items-center justify-center py-20">
+          <div className="text-center">
+            <div className="inline-block h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p className="text-gray-600">Loading leaderboard...</p>
+          </div>
         </div>
-      </div>
+      </main>
     )
   }
 
   const displayedLeaderboard = isAuthenticated ? leaderboard : leaderboard.slice(0, 20)
+  const totalServers = isAuthenticated ? leaderboard.length : 2245
+  const topEarner = displayedLeaderboard[0]?.totalEarnings || 0
+  const totalEcosystemValue = displayedLeaderboard.reduce((sum, entry) => sum + entry.totalEarnings, 0)
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">MCP Server Leaderboard</h1>
-          <p className="mt-2 text-gray-600">Top performing MCP servers ranked by total earnings</p>
-          {isAuthenticated && userRank && (
-            <p className="mt-2 text-blue-600 font-medium">Your ranking: #{userRank}</p>
-          )}
+    <main className="pt-[112px] flex justify-center mb-10">
+      <div className="max-w-[1216px] w-full flex flex-col gap-10">
+        {/* Header */}
+        <div className="flex flex-col gap-2 max-w-[595px]">
+          <h1 className="text-[32px] font-semibold text-[#14110E]">
+            MCP Server Leaderboard
+          </h1>
+          <p className="text-[16px] text-gray-500">
+            Top performing MCP servers ranked by total earnings across the ecosystem. {isAuthenticated && userRank && `Your current ranking: #${userRank}`}
+          </p>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-medium text-gray-900">Total Servers</h3>
-            <p className="text-3xl font-bold text-blue-600">{isAuthenticated ? leaderboard.length : '20+'}</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Total Servers */}
+          <div className="bg-gray-800 rounded-[12px] p-3 text-white">
+            <div className="flex flex-col gap-6">
+              <div className="w-[60px] h-[60px] bg-gray-600 rounded-lg flex items-center justify-center">
+                <Image
+                  src="/lbmcp.svg"
+                  alt="servers"
+                  width={36}
+                  height={36}
+                  className=""
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[16px] font-medium text-white">Total Servers</span>
+                <div className="text-[28px] font-semibold text-white">
+                  {isAuthenticated ? totalServers.toLocaleString() : '2,245+'}
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-medium text-gray-900">Top Earner</h3>
-            <p className="text-3xl font-bold text-green-600">
-              ${displayedLeaderboard[0]?.totalEarnings.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-            </p>
+
+          {/* Top Earner */}
+          <div className="bg-white rounded-[12px] p-3 text-white border border-gray-100">
+            <div className="flex flex-col gap-6">
+              <div className="w-[60px] h-[60px] bg-[#EAECF5] rounded-lg flex items-center justify-center">
+                <Image
+                  src="/lbearning.svg"
+                  alt="servers"
+                  width={36}
+                  height={36}
+                  className=""
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[16px] font-medium text-gray-500">Top Earner</span>
+                <div className="text-[28px] font-semibold text-black">
+                  ${topEarner.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-medium text-gray-900">Total Ecosystem Value</h3>
-            <p className="text-3xl font-bold text-purple-600">
-              ${displayedLeaderboard.reduce((sum, entry) => sum + entry.totalEarnings, 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-            </p>
+
+          {/* Average Earnings */}
+          <div className="bg-white rounded-[12px] p-3 text-white border border-gray-100">
+            <div className="flex flex-col gap-6">
+              <div className="w-[60px] h-[60px] bg-[#EAECF5] rounded-lg flex items-center justify-center">
+                <Image
+                  src="/lbearning.svg"
+                  alt="servers"
+                  width={36}
+                  height={36}
+                  className=""
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[16px] font-medium text-gray-500">Average Earnings</span>
+                <div className="text-[28px] font-semibold text-black">
+                  ${displayedLeaderboard.length > 0 ? (totalEcosystemValue / displayedLeaderboard.length).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '0.00'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Total Ecosystem Value */}
+          <div className="bg-white rounded-[12px] p-3 text-white border border-gray-100">
+            <div className="flex flex-col gap-6">
+              <div className="w-[60px] h-[60px] bg-[#EAECF5] rounded-lg flex items-center justify-center">
+                <Image
+                  src="/lbtotalecosystem.svg"
+                  alt="servers"
+                  width={36}
+                  height={36}
+                  className=""
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[16px] font-medium text-gray-500">Total Ecosystem Value</span>
+                <div className="text-[28px] font-semibold text-black">
+                  ${totalEcosystemValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Leaderboard Table */}
-        <div className="bg-white shadow rounded-lg">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900">
-              {isAuthenticated ? 'Full Rankings' : 'Top 20 Rankings'}
+        {/* Rankings Table */}
+        <div className="bg-white rounded-[14px] border border-gray-100 overflow-hidden">
+          {/* Table Header */}
+          <div className="flex items-center justify-between py-4 px-6">
+            <h2 className="text-[24px] font-semibold text-black">
+              {isAuthenticated ? 'All Rankings' : 'Top 20 Rankings'}
             </h2>
-            {!isAuthenticated && (
-              <p className="text-sm text-gray-500 mt-1">
-                <Link href="/api/auth/signin" className="text-blue-600 hover:text-blue-800">
-                  Sign in
-                </Link> to see the full leaderboard and your ranking
-              </p>
-            )}
+            <Select value={timePeriod} onValueChange={setTimePeriod}>
+              <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Select a time period" className="text-[16px] font-semibold text-gray-700 placeholder:text-gray-700" />
+              </SelectTrigger>
+              <SelectContent>
+                  <SelectGroup>
+                  <SelectItem value="last7days"><span className="text-[16px] font-semibold text-gray-700">Last 7 Days</span></SelectItem>
+                  <SelectItem value="last30days"><span className="text-[16px] font-semibold text-gray-700">Last 30 Days</span></SelectItem>
+                  <SelectItem value="last90days"><span className="text-[16px] font-semibold text-gray-700">Last 90 Days</span></SelectItem>
+                  <SelectItem value="last365days"><span className="text-[16px] font-semibold text-gray-700">Last 365 Days</span></SelectItem>
+                  </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
+
+          {!isAuthenticated && (
+            <div className="px-6 pb-4">
+              <p className="text-sm text-gray-500">
+                {/* <Link href="/api/auth/signin" className="text-blue-600 hover:text-blue-800 underline"> */}
+                  Sign in
+                 to see the full leaderboard and your ranking
+              </p>
+            </div>
+          )}
+
+          {/* Table Content */}
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="w-full">
+              <thead className="bg-white">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Rank
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    MCP Server
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Author
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Total Earnings
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    MCP Server Link
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Repository
-                  </th>
+                  <th className="px-6 py-4 text-left text-[14px] text-gray-500 font-normal">Rank</th>
+                  <th className="px-6 py-4 text-left text-[14px] text-gray-500 font-normal">MCP Server Name</th>
+                  <th className="px-6 py-4 text-left text-[14px] text-gray-500 font-normal">Author</th>
+                  <th className="px-6 py-4 text-left text-[14px] text-gray-500 font-normal">Total Earnings</th>
+                  <th className="px-6 py-4 text-left text-[14px] text-gray-500 font-normal">MCP Server Link</th>
+                  <th className="px-6 py-4 text-left text-[14px] text-gray-500 font-normal">Repository</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {displayedLeaderboard.map((entry, index) => {
-                  const isCurrentUser = entry.isCurrentUser && isAuthenticated
-                  const showEllipsis = isAuthenticated && index > 20 && index < (userRank || 0) - 3
-                  const shouldShow = !showEllipsis && (index < 20 || (isAuthenticated && (index >= (userRank || 0) - 3 && index <= (userRank || 0) + 1)))
+              <tbody className="bg-white">
+                {displayedLeaderboard.map((item, index) => {
+                  const isCurrentUser = item.isCurrentUser && isAuthenticated
+                  const showEllipsis = isAuthenticated && index > 4 && index < (userRank || 0) - 3
+                  const shouldShow = !showEllipsis && (index < 5 || (isAuthenticated && (index >= (userRank || 0) - 3 && index <= (userRank || 0) + 1)))
                   
-                  if (showEllipsis && index === 21) {
+                  if (showEllipsis && index === 5) {
                     return (
                       <tr key="ellipsis" className="bg-gray-50">
                         <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
-                          ... {(userRank || 0) - 24} more servers ...
+                          ... {(userRank || 0) - 9} more servers ...
                         </td>
                       </tr>
                     )
@@ -394,65 +455,67 @@ export default function Leaderboard() {
                   if (!shouldShow && !showEllipsis) {
                     return null
                   }
-                  
+
                   return (
                     <tr 
-                      key={entry.id} 
-                      className={`hover:bg-gray-50 ${isCurrentUser ? 'bg-blue-50 border-l-4 border-blue-500' : ''}`}
+                      key={item.id} 
+                      className={`${isCurrentUser ? 'bg-gray-800 text-white' : 'hover:bg-gray-50'}`}
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <span className={`text-lg font-bold ${index < 3 ? 'text-yellow-600' : 'text-gray-900'}`}>
-                            #{index + 1}
-                          </span>
-                          {index === 0 && <span className="ml-2 text-yellow-500">🏆</span>}
-                          {index === 1 && <span className="ml-2 text-gray-400">🥈</span>}
-                          {index === 2 && <span className="ml-2 text-yellow-600">🥉</span>}
-                          {isCurrentUser && <span className="ml-2 text-blue-500">👤</span>}
+                        <div className={`text-[16px] font-medium ${isCurrentUser ? 'text-white' : 'text-gray-700'}`}>
+                          #{index + 1}
+                          {index === 0 && <span className="ml-2">🏆</span>}
+                          {index === 1 && <span className="ml-2">🥈</span>}
+                          {index === 2 && <span className="ml-2">🥉</span>}
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="max-w-xs">
-                          <div className={`text-sm font-medium ${isCurrentUser ? 'text-blue-900' : 'text-gray-900'}`}>
-                            {entry.name}
+                        <div className="flex flex-col">
+                          <div className={`text-[16px] font-medium ${isCurrentUser ? 'text-white' : 'text-gray-700'}`}>
+                            {item.name}
                           </div>
-                          <div className="text-sm text-gray-500 truncate">
-                            {entry.description}
+                          <div className={`text-sm font-medium ${isCurrentUser ? 'text-gray-300' : 'text-gray-500'}`}>
+                            {shortenDescription(item.description)}
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {entry.author}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className={`text-[16px] ${isCurrentUser ? 'text-white' : 'text-gray-700'} font-medium`}>
+                          {item.author}
+                        </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-600">
-                        ${entry.totalEarnings.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-[16px] font-bold text-green-600">
+                          ${item.totalEarnings.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <div className="flex items-center space-x-2">
-                          <code 
-                            className="bg-gray-100 px-2 py-1 rounded text-xs font-mono text-gray-800 cursor-default"
-                            title={entry.mcpServerLink}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className={`flex justify-between items-center gap-2 p-2 ${isCurrentUser ? 'bg-gray-600' : 'bg-gray-200'} rounded-[4px]`}>
+                          <span className={`text-sm font-medium ${isCurrentUser ? 'text-white' : 'text-gray-700'}`}>
+                            {shortenMcpLink(item.mcpServerLink)}
+                          </span>
+                          <button 
+                            className="rounded-lg"
+                            onClick={() => copyToClipboard(item.mcpServerLink)}
                           >
-                            {shortenMcpLink(entry.mcpServerLink)}
-                          </code>
-                          <button
-                            onClick={() => copyToClipboard(entry.mcpServerLink)}
-                            className={`px-2 py-1 text-xs rounded transition-colors ${
-                              copiedLink === entry.mcpServerLink
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
-                            }`}
-                          >
-                            {copiedLink === entry.mcpServerLink ? 'Copied!' : 'Copy'}
+                            <Image
+                              src="/copy.svg"
+                              alt="copy"
+                              width={18}
+                              height={18}
+                              style={{
+                                  filter: isCurrentUser ? 'brightness(0) invert(1)' : 'none'
+                              }}
+                            />
                           </button>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <a
-                          href={entry.repoLink}
+                          href={item.repoLink}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 underline"
+                          className={`text-[16px] font-medium underline ${isCurrentUser ? 'text-white hover:text-gray-200' : 'text-gray-700 hover:text-gray-500'}`}
                         >
                           View Repository
                         </a>
@@ -465,19 +528,14 @@ export default function Leaderboard() {
           </div>
         </div>
 
-        {!isAuthenticated && (
-          <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
-            <h3 className="text-lg font-medium text-blue-900 mb-2">Want to see your ranking?</h3>
-            <p className="text-blue-800 mb-4">Sign in to view the complete leaderboard and see where your MCP servers rank!</p>
-            <Link
-              href="/api/auth/signin"
-              className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded transition duration-200"
-            >
-              Sign In
-            </Link>
+        {copiedLink && (
+          <div className="fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg">
+            Link copied to clipboard!
           </div>
         )}
       </div>
-    </div>
-  )
-}
+    </main>
+  );
+};
+
+export default LeaderboardPage;
