@@ -1,41 +1,121 @@
 "use client";
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { pipedreamService, MAJOR_MCP_SERVERS, MCPServer, AccountConnectionResponse } from "@/lib/pipedreamService";
+import { PipedreamClient } from "@pipedream/sdk";
+import { 
+  SiGooglesheets, 
+  SiGithub, 
+  SiNotion, 
+  SiGmail, 
+  SiOpenai, 
+  SiSlack, 
+  SiLinear, 
+  SiAirtable 
+} from "react-icons/si";
 
 const MCPProxyServer = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [mcpServers, setMcpServers] = useState<MCPServer[]>(MAJOR_MCP_SERVERS);
+  const [externalUserId, setExternalUserId] = useState<string>("user_id_me");
+  const [connectingServers, setConnectingServers] = useState<Set<string>>(new Set());
   
-  const mcpServers = [
-    {
-      id: 1,
-      name: "Web Scraping Server",
-      description: "Create an MCP server that can scrape websites and extract structured data.",
-      icon: "/mcpserver.svg", // Using available icon
-      connected: false
-    },
-    {
-      id: 2,
-      name: "Web Scraping Server",
-      description: "Create an MCP server that can scrape websites and extract structured data.",
-      icon: "/mcpserver.svg",
-      connected: true
-    },
-    {
-      id: 3,
-      name: "Web Scraping Server", 
-      description: "Create an MCP server that can scrape websites and extract structured data.",
-      icon: "/mcpserver.svg",
-      connected: false
-    }
-  ];
+  // Icon mapping for react-icons
+  const iconMap = {
+    SiGooglesheets,
+    SiGithub,
+    SiNotion,
+    SiGmail,
+    SiOpenai,
+    SiSlack,
+    SiLinear,
+    SiAirtable
+  } as const;
+  
+  useEffect(() => {
+    // Generate external user ID on component mount
+    const userId = pipedreamService.generateExternalUserId();
+    setExternalUserId(userId);
+    console.log('🆔 Generated external user ID:', userId);
+  }, []);
 
   const filteredServers = mcpServers.filter(server =>
     server.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     server.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleConnect = (serverId: number) => {
-    console.log(`Connecting to server ${serverId}`);
+  const handleConnect = async (server: MCPServer) => {
+    if (connectingServers.has(server.id)) {
+      console.log(`Already connecting to ${server.name}`);
+      return;
+    }
+
+    console.log(`🔌 Starting connection process for ${server.name} (${server.app})`);
+    
+    // Add to connecting servers set
+    setConnectingServers(prev => new Set(prev).add(server.id));
+
+    try {
+      // Generate a real connect token using the Pipedream API
+      const tokenResponse = await pipedreamService.generateConnectToken(externalUserId);
+      
+      if (!tokenResponse) {
+        throw new Error('Failed to generate connect token');
+      }
+      
+      console.log(`🎫 Generated connect token for ${server.name}:`, {
+        token: tokenResponse.token.substring(0, 20) + '...',
+        expiresAt: tokenResponse.expiresAt,
+        connectLinkUrl: tokenResponse.connectLinkUrl,
+        userId: externalUserId
+      });
+      
+      const client = new PipedreamClient({
+        externalUserId: externalUserId,
+        tokenCallback: async () => {
+          // Return the token we already generated
+          return tokenResponse.token;
+        }
+      })
+
+      client.connectAccount({
+        app: server.app, 
+        token: tokenResponse.token, 
+        onSuccess: (account: any) => {
+          // Handle successful connection
+          console.log(`✅ Account successfully connected ${server.name}:`, account);
+          
+          // Update server connection status
+          setMcpServers(prev => prev.map(s => 
+            s.id === server.id ? { ...s, connected: true } : s
+          ));
+        },
+        onError: (err: any) => {
+          // Handle connection error
+          console.error(`❌ Connection error for ${server.name}:`, err);
+        }
+      });
+    } catch (error) {
+      console.error(`❌ Connection error for ${server.name}:`, error);
+    } finally {
+      // Remove from connecting servers set
+      setConnectingServers(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(server.id);
+        return newSet;
+      });
+    }
+  };
+
+  const handleDisconnect = (server: MCPServer) => {
+    console.log(`🔌 Disconnecting from ${server.name}`);
+    
+    // Update server connection status
+    setMcpServers(prev => prev.map(s => 
+      s.id === server.id ? { ...s, connected: false } : s
+    ));
+    
+    console.log(`✅ Disconnected from ${server.name}`);
   };
 
   return (
@@ -79,17 +159,29 @@ const MCPProxyServer = () => {
 
       {/* Server List */}
       <div className="flex flex-col gap-[28px]">
-        {filteredServers.map((server) => (
+        {filteredServers.map((server) => {
+          const isConnecting = connectingServers.has(server.id);
+          
+          return (
           <div key={server.id} className="bg-white rounded-[12px] border border-gray-200 p-4 hover:shadow-sm transition-shadow">
             <div className="flex items-center justify-between">
               <div className="flex items-start space-x-3 flex-1">
                 {/* Server Icon */}
-                  <Image
-                    src={server.icon}
-                    alt={server.name}
-                    width={40}
-                    height={40}
-                  />
+                <div className="w-10 h-10 flex items-center justify-center">
+                  {(() => {
+                    const IconComponent = iconMap[server.icon as keyof typeof iconMap];
+                    return IconComponent ? (
+                      <IconComponent className="w-10 h-10 text-gray-700" />
+                    ) : (
+                      <Image
+                        src="/mcpserver.svg"
+                        alt={server.name}
+                        width={40}
+                        height={40}
+                      />
+                    );
+                  })()}
+                </div>
                 {/* Server Info */}
                 <div className="gap-3 flex flex-col">
                   <h3 className="text-[22px] font-semibold text-gray-900 flex items-center gap-3">
@@ -110,14 +202,22 @@ const MCPProxyServer = () => {
               </div>
               {/* Connect Button */}
               <button
-                onClick={() => handleConnect(server.id)}
-                className={`ml-4 px-4 py-2 hover:bg-gray-700 text-sm font-medium rounded-md transition-colors flex-shrink-0 ${server.connected ? "bg-gray-100 text-gray-700" : "bg-gray-800 text-white"}`}
+                onClick={() => server.connected ? handleDisconnect(server) : handleConnect(server)}
+                disabled={isConnecting}
+                className={`ml-4 px-4 py-2 text-sm font-medium rounded-md transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed ${
+                  server.connected 
+                    ? "bg-red-100 text-red-700 hover:bg-red-200" 
+                    : isConnecting 
+                    ? "bg-blue-100 text-blue-700" 
+                    : "bg-gray-800 text-white hover:bg-gray-700"
+                }`}
               >
-                {server.connected ? "Disconnect" : "Connect"}
+                {isConnecting ? "Connecting..." : server.connected ? "Disconnect" : "Connect"}
               </button>
             </div>
           </div>
-        ))}
+        )}
+        )}
       </div>
       
       {/* Empty State */}
