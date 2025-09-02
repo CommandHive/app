@@ -2,10 +2,20 @@
 
 import Image from "next/image";
 import { useState } from "react";
+import FileBrowser from "./FileBrowser";
+
+interface FileNode {
+  name: string;
+  type: "file" | "folder";
+  children?: FileNode[];
+  content?: string;
+  path: string;
+}
 
 interface GeneratedCodeProps {
   codeContent?: string;
   onCopy?: () => void;
+  files?: FileNode[];
 }
 
 const GeneratedCode = ({ 
@@ -38,13 +48,56 @@ function updateGutters(cm) {
 }
 
 return false;`,
-  onCopy
+  onCopy,
+  files = [
+    {
+      name: "src",
+      type: "folder",
+      path: "/src",
+      children: [
+        {
+          name: "index.js",
+          type: "file",
+          path: "/src/index.js",
+          content: "console.log('Hello World!');"
+        },
+        {
+          name: "components",
+          type: "folder", 
+          path: "/src/components",
+          children: [
+            {
+              name: "App.js",
+              type: "file",
+              path: "/src/components/App.js",
+              content: "import React from 'react';\n\nfunction App() {\n  return <div>Hello World!</div>;\n}\n\nexport default App;"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      name: "package.json",
+      type: "file", 
+      path: "/package.json",
+      content: '{\n  "name": "my-project",\n  "version": "1.0.0"\n}'
+    }
+  ]
 }: GeneratedCodeProps) => {
   const [copied, setCopied] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<string | undefined>();
+  const [currentCode, setCurrentCode] = useState(codeContent);
+
+  const handleFileSelect = (file: FileNode) => {
+    if (file.type === "file" && file.content) {
+      setCurrentCode(file.content);
+      setSelectedFile(file.path);
+    }
+  };
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(codeContent);
+      await navigator.clipboard.writeText(currentCode);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
       if (onCopy) {
@@ -60,12 +113,21 @@ return false;`,
   };
 
   return (
-    <div className="h-full flex flex-col px-4 pb-6">
-      <div className="flex items-center py-6">
+    <div className="h-full flex flex-col">
+      <div className="flex items-center py-6 px-4">
         <h3 className="text-[24px] font-semibold text-black">MCP Server Code</h3>
       </div>
       
-      <div className="flex-1 overflow-auto border rounded-lg bg-[#FCFCFD]">
+      <div className="flex-1 flex overflow-hidden">
+        <div className="w-64 flex-shrink-0">
+          <FileBrowser 
+            files={files} 
+            onFileSelect={handleFileSelect}
+            selectedFile={selectedFile}
+          />
+        </div>
+        
+        <div className="flex-1 overflow-auto border rounded-lg bg-[#FCFCFD] mx-4 mb-6">
         <pre className="relative text-sm font-mono leading-relaxed p-6">
           <div className="absolute flex gap-[10px] top-6 right-6">
             <div 
@@ -92,7 +154,7 @@ return false;`,
             </div>
           </div>
           <code className="text-gray-800">
-            {codeContent.split('\n').map((line, index) => (
+            {currentCode.split('\n').map((line, index) => (
               <div key={index} className="flex">
                 <span className="text-gray-400 select-none w-8 mr-4 shrink-0">
                   {index + 1}
@@ -142,6 +204,7 @@ return false;`,
             ))}
           </code>
         </pre>
+        </div>
       </div>
     </div>
   );

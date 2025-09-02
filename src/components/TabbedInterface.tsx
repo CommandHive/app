@@ -12,8 +12,17 @@ import ToolsCall from "./ToolCalls";
 import EnvironmentVariables from "./EnviormentVariables";
 import Terminal from "./Terminal";
 import MCPProxyServer from "./MCProxy";
+import FileBrowser from "./FileBrowser";
 import { autocompletion } from "@codemirror/autocomplete";
 import {python} from "@codemirror/lang-python"
+
+interface FileNode {
+  name: string;
+  type: "file" | "folder";
+  children?: FileNode[];
+  content?: string;
+  path: string;
+}
 
 interface Tab {
   id: string;
@@ -57,16 +66,38 @@ interface ToolCall {
 const CodeMirrorEditor = ({ 
   initialCode, 
   onCopy, 
-  copied 
+  copied,
+  files = [],
+  onSaveFile
 }: { 
   initialCode: string; 
   onCopy: () => void; 
   copied: boolean;
+  files?: FileNode[];
+  onSaveFile?: (filePath: string, content: string) => Promise<boolean>;
 }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const [editor, setEditor] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [language, setLanguage] = useState('javascript');
+  const [selectedFile, setSelectedFile] = useState<string | undefined>();
+  const [currentCode, setCurrentCode] = useState(initialCode);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
+
+  const handleFileSelect = (file: FileNode) => {
+    if (file.type === "file" && file.content !== undefined) {
+      setCurrentCode(file.content);
+      setSelectedFile(file.path);
+      setHasUnsavedChanges(false);
+      setSaveStatus('idle');
+      
+      // Update the editor content if it exists
+      if (editor) {
+        editor.setValue(file.content);
+      }
+    }
+  };
 
   useEffect(() => {
     const loadCodeMirror = async () => {
@@ -121,7 +152,7 @@ const CodeMirrorEditor = ({
             editorRef.current.innerHTML = '';
             
             const cm = (window as any).CodeMirror(editorRef.current, {
-              value: initialCode,
+              value: currentCode,
               mode: language,
               theme: 'material',
               lineNumbers: true,
@@ -133,7 +164,15 @@ const CodeMirrorEditor = ({
               lineWrapping: true,
               foldGutter: true,
               gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
-                       });
+            });
+            cm.setSize('100%', '100%');
+
+            // Verify this is actually CodeMirror v5 
+            console.log('CodeMirror version check:', {
+              hasToTextArea: typeof cm.toTextArea === 'function',
+              hasGetWrapperElement: typeof cm.getWrapperElement === 'function',
+              version: (window as any).CodeMirror.version
+            });
 
             setEditor(cm);
             setIsLoading(false);
@@ -156,22 +195,46 @@ const CodeMirrorEditor = ({
     // Cleanup
     return () => {
       if (editor) {
-        editor.toTextArea();
+        try {
+          // For CodeMirror v5: Proper cleanup
+          if (typeof editor.toTextArea === 'function') {
+            // v5 has toTextArea method
+            editor.toTextArea();
+          } else if (editor.getWrapperElement) {
+            // Alternative cleanup for v5
+            const wrapper = editor.getWrapperElement();
+            if (wrapper && wrapper.parentNode) {
+              wrapper.parentNode.removeChild(wrapper);
+            }
+          }
+        } catch (error) {
+          console.warn('CodeMirror cleanup error:', error);
+        } finally {
+          setEditor(null);
+        }
       }
     };
-  }, [initialCode]);
+  }, [currentCode]);
 
-  // Update editor content when initialCode changes
+  // Update editor content when currentCode changes
   useEffect(() => {
-    if (editor && editor.getValue() !== initialCode) {
-      editor.setValue(initialCode);
+    if (editor && typeof editor.getValue === 'function' && editor.getValue() !== currentCode) {
+      try {
+        editor.setValue(currentCode);
+      } catch (error) {
+        console.warn('Error updating editor content:', error);
+      }
     }
-  }, [editor, initialCode]);
+  }, [editor, currentCode]);
 
   // Update editor language
   useEffect(() => {
-    if (editor && language) {
-      editor.setOption('mode', language);
+    if (editor && typeof editor.setOption === 'function' && language) {
+      try {
+        editor.setOption('mode', language);
+      } catch (error) {
+        console.warn('Error updating editor language:', error);
+      }
     }
   }, [editor, language]);
 
@@ -185,11 +248,11 @@ const CodeMirrorEditor = ({
 
   // Auto-detect language when code changes
   useEffect(() => {
-    const detectedLang = detectLanguage(initialCode);
+    const detectedLang = detectLanguage(currentCode);
     if (detectedLang !== language) {
       setLanguage(detectedLang);
     }
-  }, [initialCode]);
+  }, [currentCode]);
 
   const handleFormat = () => {
     if (editor) {
@@ -201,7 +264,7 @@ const CodeMirrorEditor = ({
   };
 
   const getCurrentCode = () => {
-    return editor ? editor.getValue() : initialCode;
+    return editor ? editor.getValue() : currentCode;
   };
 
   const handleCopy = () => {
@@ -210,26 +273,72 @@ const CodeMirrorEditor = ({
     onCopy();
   };
 
+  const handleSave = async () => {
+    if (!selectedFile || !onSaveFile) return;
+    
+    setIsSaving(true);
+    setSaveStatus('idle');
+    
+    try {
+      const code = getCurrentCode();
+      const success = await onSaveFile(selectedFile, code);
+      setSaveStatus(success ? 'saved' : 'error');
+      
+      if (success) {
+        setTimeout(() => setSaveStatus('idle'), 2000);
+      }
+    } catch (error) {
+      setSaveStatus('error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Track content changes to show unsaved indicator
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  
+  useEffect(() => {
+    if (editor) {
+      editor.on('change', () => {
+        setHasUnsavedChanges(true);
+        setSaveStatus('idle');
+      });
+    }
+  }, [editor]);
+
   return (
-    <div className="h-full bg-white flex flex-col">
+    <div className="h-screen bg-white flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 bg-gray-50 border-b border-gray-200">
         <div className="flex items-center space-x-4">
           <h3 className="text-lg font-semibold text-gray-900">Generated Code</h3>
-          <select 
-            value={language} 
-            onChange={(e) => setLanguage(e.target.value)}
-            className="bg-white border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="javascript">JavaScript</option>
-            <option value="python">Python</option>
-            <option value="xml">HTML</option>
-            <option value="css">CSS</option>
-            <option value="text">Plain Text</option>
-          </select>
+          
         </div>
         
         <div className="flex items-center space-x-2">
+          {selectedFile && (
+            <>
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                  saveStatus === 'saved'
+                    ? "bg-green-100 text-green-800"
+                    : saveStatus === 'error'
+                    ? "bg-red-100 text-red-800"
+                    : hasUnsavedChanges
+                    ? "bg-orange-100 text-orange-800 hover:bg-orange-200"
+                    : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                }`}
+              >
+                {isSaving ? "Saving..." : 
+                 saveStatus === 'saved' ? "Saved" :
+                 saveStatus === 'error' ? "Error" :
+                 hasUnsavedChanges ? "Save*" : "Save"}
+              </button>
+              <div className="w-px h-4 bg-gray-300"></div>
+            </>
+          )}
           <button
             onClick={handleFormat}
             className="px-3 py-1 text-sm bg-gray-200 hover:bg-gray-300 rounded-md font-medium transition-colors"
@@ -249,39 +358,62 @@ const CodeMirrorEditor = ({
         </div>
       </div>
 
-      {/* Editor Container */}
-      <div className="flex-1 relative">
-        {/* {isLoading ? (
-          <div className="h-full flex items-center justify-center bg-gray-50">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Loading editor...</p>
+      {/* Main Content with Sidebar */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
+        {/* File Browser Sidebar */}
+        <div className="w-64 flex-shrink-0">
+          {files.length > 0 ? (
+            <FileBrowser 
+              files={files} 
+              onFileSelect={handleFileSelect}
+              selectedFile={selectedFile}
+            />
+          ) : (
+            <div className="h-full bg-white border-r border-gray-200 flex items-center justify-center">
+              <div className="text-center px-4">
+                <p className="text-sm text-gray-500">No files generated yet</p>
+                <p className="text-xs text-gray-400 mt-1">Files will appear here when Claude Code SDK generates them</p>
+              </div>
+            </div>
+          )}
+        </div>
+        
+        {/* Editor Container */}
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex-1 relative min-h-0">
+            {/* {isLoading ? (
+              <div className="h-full flex items-center justify-center bg-gray-50">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <p className="text-gray-600">Loading editor...</p>
+                </div>
+              </div>
+            ) : ( */}
+              <div 
+                ref={editorRef}
+                className="h-full min-h-0"
+                style={{ fontSize: '14px' }}
+              />
+            {/* )} */}
+            
+            {/* Fallback text editor if CodeMirror fails */}
+            {!isLoading && !editor && (
+              <textarea
+                value={currentCode}
+                readOnly
+                className="w-full h-full p-4 font-mono text-sm resize-none border-none focus:outline-none bg-gray-900 text-green-400"
+                style={{ fontSize: '14px' }}
+              />
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 py-2 bg-gray-50 border-t border-gray-200 text-xs text-gray-600">
+            <div className="flex justify-between items-center">
+              <span>Language: {language}</span>
+              <span>Lines: {getCurrentCode().split('\n').length}</span>
             </div>
           </div>
-        ) : ( */}
-          <div 
-            ref={editorRef}
-            className="h-full"
-            style={{ fontSize: '14px' }}
-          />
-        {/* )} */}
-        
-        {/* Fallback text editor if CodeMirror fails */}
-        {!isLoading && !editor && (
-          <textarea
-            value={initialCode}
-            readOnly
-            className="w-full h-full p-4 font-mono text-sm resize-none border-none focus:outline-none bg-gray-900 text-green-400"
-            style={{ fontSize: '14px' }}
-          />
-        )}
-      </div>
-
-      {/* Footer */}
-      <div className="px-6 py-2 bg-gray-50 border-t border-gray-200 text-xs text-gray-600">
-        <div className="flex justify-between items-center">
-          <span>Language: {language}</span>
-          <span>Lines: {getCurrentCode().split('\n').length}</span>
         </div>
       </div>
     </div>
@@ -296,6 +428,8 @@ export default function TabbedInterface({
 }: TabbedInterfaceProps) {
   const { accessToken } = useAuth();
   const [copied, setCopied] = useState(false);
+  const [chatFiles, setChatFiles] = useState<FileNode[]>([]);
+  const [loadingFiles, setLoadingFiles] = useState(false);
   const [deploymentStatus, setDeploymentStatus] = useState<
     "idle" | "deploying" | "success" | "error"
   >("idle");
@@ -397,6 +531,68 @@ export default function TabbedInterface({
   };
 
   const availableTools = getToolsFromMessages();
+
+  // Load files from backend
+  const loadChatFiles = async () => {
+    if (!chatId || !accessToken) return;
+    
+    setLoadingFiles(true);
+    try {
+      const response = await apiService.getChatFiles(chatId, accessToken);
+      if (response?.success) {
+        setChatFiles(response.files || []);
+      }
+    } catch (error) {
+      console.error('Error loading chat files:', error);
+    } finally {
+      setLoadingFiles(false);
+    }
+  };
+
+  // Load files when component mounts or chatId changes
+  useEffect(() => {
+    loadChatFiles();
+  }, [chatId, accessToken]);
+
+  // Reload files when messages change (new files may have been generated)
+  useEffect(() => {
+    if (messages.length > 0) {
+      // Small delay to allow backend file operations to complete
+      const timer = setTimeout(() => {
+        loadChatFiles();
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [messages.length]);
+
+  // Save file content
+  const saveFileContent = async (filePath: string, content: string) => {
+    if (!chatId || !accessToken) return false;
+    
+    try {
+      const response = await apiService.updateChatFile(chatId, filePath, content, accessToken);
+      if (response?.success) {
+        // Update the local file tree with new content
+        const updateFileInTree = (files: FileNode[]): FileNode[] => {
+          return files.map(file => {
+            if (file.type === "file" && file.path === filePath) {
+              return { ...file, content };
+            } else if (file.type === "folder" && file.children) {
+              return { ...file, children: updateFileInTree(file.children) };
+            }
+            return file;
+          });
+        };
+        
+        setChatFiles(prev => updateFileInTree(prev));
+        return true;
+      }
+    } catch (error) {
+      console.error('Error saving file:', error);
+    }
+    return false;
+  };
 
   // Initialize tool call states
   const initializeToolCallState = (toolId: string) => {
@@ -817,6 +1013,8 @@ export default function TabbedInterface({
             initialCode={extractCodeFromResponse()}
             onCopy={copyToClipboard}
             copied={copied}
+            files={chatFiles}
+            onSaveFile={saveFileContent}
           />
         );
 

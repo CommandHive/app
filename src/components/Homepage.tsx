@@ -107,23 +107,25 @@ const HomePage = () => {
   const [inputValue, setInputValue] = useState("");
   const [showVideoModal, setShowVideoModal] = useState(false);
 
-  // Authentication check from old code
+  // Authentication check - use AuthContext tokens only
   useEffect(() => {
     console.log("🏠 [Homepage] ===== HOMEPAGE USEEFFECT TRIGGERED =====");
-    const sessionTokenStored = localStorage.getItem("session_token");
-    const jwtToken = localStorage.getItem("jwt_token");
+    const accessTokenStored = localStorage.getItem("access_token");
     console.log(
-      "🏠 [Homepage] localStorage session_token found:",
-      !!sessionTokenStored
+      "🏠 [Homepage] localStorage access_token found:",
+      !!accessTokenStored
     );
-    console.log("🏠 [Homepage] localStorage jwt_token found:", !!jwtToken);
     console.log("🏠 [Homepage] sessionToken from hook:", !!sessionToken);
     console.log(
       "🏠 [Homepage] sessionToken (first 20 chars):",
       sessionToken ? sessionToken.substring(0, 20) + "..." : "NO TOKEN"
     );
-    setLocalStorageToken(sessionTokenStored || jwtToken);
-  }, [sessionToken]);
+    console.log("🏠 [Homepage] isAuthenticated from hook:", isAuthenticated);
+    if(isAuthenticated){
+      router.push('/');
+    }
+    setLocalStorageToken(accessTokenStored);
+  }, [sessionToken, isAuthenticated]);
 
   // Search/Create functionality from old code
   const handleSearch = async () => {
@@ -144,15 +146,15 @@ const HomePage = () => {
       localStorageToken
     );
 
-    // Check for session token first, then fall back to localStorage
-    const token = sessionToken || localStorageToken;
+    // Use session token from AuthContext
+    const token = sessionToken;
     console.log(
       "🔍 [Homepage.handleSearch] Final token to use:",
       token ? token.substring(0, 20) + "..." : "NO TOKEN"
     );
 
-    if (!token) {
-      console.log("❌ [Homepage.handleSearch] No session token available");
+    if (!token || !isAuthenticated) {
+      console.log("❌ [Homepage.handleSearch] No session token or not authenticated");
       alert("Please sign in first to create a chat");
       return;
     }
@@ -178,9 +180,8 @@ const HomePage = () => {
     setSelectedExample(example.id);
   };
 
-  // Check authentication from session token hook and localStorage fallback
-  const hasToken = sessionToken || localStorageToken;
-  const authenticatedState = isAuthenticated || hasToken;
+  // Use AuthContext authentication state directly
+  const authenticatedState = isAuthenticated;
 
   // Typewriter effect from new code
   const startTypewriter = useCallback(() => {

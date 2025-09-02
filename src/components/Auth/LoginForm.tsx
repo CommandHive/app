@@ -1,7 +1,8 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { logGoogleAuthDebug } from '@/lib/googleAuthDebug'
 
 interface LoginFormProps {
   onSwitchToSignup: () => void
@@ -44,44 +45,141 @@ export default function LoginForm({ onSwitchToSignup }: LoginFormProps) {
     window.location.href = githubAuthUrl
   }
 
-  const handleGoogleLogin = async () => {
+  const initializeGoogleSignIn = async () => {
     try {
-      // Initialize Google OAuth
-      if (typeof window !== 'undefined' && window.google) {
-        window.google.accounts.id.initialize({
-          client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
-          use_fedcm_for_prompt: false,
-          callback: async (response: any) => {
-            try {
-              // Decode the Google JWT token
-              const payload = JSON.parse(atob(response.credential.split('.')[1]))
-              
-              const result = await loginWithOAuth('google', {
-                id: payload.sub,
-                email: payload.email,
-                name: payload.name,
-                picture: payload.picture
-              })
-              
-              if (!result.success) {
-                setError(result.error || 'Google login failed')
-              }
-            } catch (error) {
-              console.error('Google login error:', error)
-              setError('Google login failed')
-            }
-          }
-        })
-
-        window.google.accounts.id.prompt()
-      } else {
-        setError('Google Sign-In not available')
+      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+      
+      if (!clientId) {
+        console.warn('Google OAuth client ID not configured');
+        return false;
       }
+
+      // Check if Google Sign-In script is loaded
+      if (typeof window === 'undefined' || !window.google?.accounts?.id) {
+        return false;
+      }
+
+      // Initialize Google OAuth with improved configuration
+      window.google.accounts.id.initialize({
+        client_id: clientId,
+        callback: async (response: any) => {
+          try {
+            if (!response.credential) {
+              setError('No credential received from Google');
+              return;
+            }
+
+            // Decode the Google JWT token with better error handling
+            const tokenParts = response.credential.split('.');
+            if (tokenParts.length !== 3) {
+              setError('Invalid Google credential format');
+              return;
+            }
+
+            const payload = JSON.parse(atob(tokenParts[1]));
+            
+            if (!payload.email || !payload.sub) {
+              setError('Incomplete user data from Google');
+              return;
+            }
+
+            const result = await loginWithOAuth('google', {
+              id: payload.sub,
+              email: payload.email,
+              name: payload.name || payload.email,
+              picture: payload.picture
+            });
+            
+            if (!result.success) {
+              setError(result.error || 'Google login failed');
+            }
+          } catch (error) {
+            console.error('Google callback error:', error);
+            setError('Failed to process Google login. Please try again.');
+          }
+        },
+        auto_select: false,
+        cancel_on_tap_outside: true
+      });
+
+      // Try to render the button
+      const buttonContainer = document.getElementById('google-signin-button');
+      if (buttonContainer) {
+        try {
+          window.google.accounts.id.renderButton(buttonContainer, {
+            type: 'standard',
+            shape: 'rectangular',
+            theme: 'outline',
+            text: 'continue_with',
+            size: 'large',
+            width: buttonContainer.offsetWidth
+          });
+          
+          // Hide the fallback button if Google button renders successfully
+          const fallbackButton = document.getElementById('google-fallback-button');
+          if (fallbackButton) {
+            fallbackButton.style.display = 'none';
+          }
+          
+          return true;
+        } catch (error) {
+          console.error('Error rendering Google button:', error);
+          return false;
+        }
+      }
+      return false;
     } catch (error) {
-      console.error('Google login error:', error)
-      setError('Google login failed')
+      console.error('Google Sign-In initialization error:', error);
+      return false;
     }
-  }
+  };
+
+  const handleGoogleLogin = async () => {
+    // For fallback button - try to prompt sign-in
+    if (window.google?.accounts?.id) {
+      try {
+        window.google.accounts.id.prompt();
+      } catch (error) {
+        console.error('Error prompting Google sign-in:', error);
+        setError('Google Sign-In is not available. Please try refreshing the page.');
+      }
+    } else {
+      setError('Google Sign-In script not loaded. Please refresh and try again.');
+    }
+  };
+
+  // Initialize Google Sign-In on component mount
+  useEffect(() => {
+    // Wait for Google script to load and initialize
+    const tryInitialize = async () => {
+      let attempts = 0;
+      const maxAttempts = 50; // 5 seconds total
+
+      const checkAndInit = async () => {
+        if (attempts >= maxAttempts) {
+          console.warn('Google Sign-In script failed to load after 5 seconds');
+          return;
+        }
+
+        const success = await initializeGoogleSignIn();
+        if (!success) {
+          attempts++;
+          setTimeout(checkAndInit, 100);
+        }
+      };
+
+      if (typeof window !== 'undefined') {
+        checkAndInit();
+      }
+    };
+
+    tryInitialize();
+    
+    // Debug Google Auth configuration
+    if (process.env.NODE_ENV === 'development') {
+      setTimeout(() => logGoogleAuthDebug(), 1000);
+    }
+  }, []);
 
   return (
     <div className="max-w-md mx-auto mt-8 p-6 bg-white rounded-lg shadow-md">
@@ -142,7 +240,12 @@ export default function LoginForm({ onSwitchToSignup }: LoginFormProps) {
         </div>
 
         <div className="mt-6 space-y-3">
+          {/* Google Sign-In Button Container */}
+          <div id="google-signin-button" className="w-full"></div>
+          
+          {/* Fallback custom button if Google button doesn't render */}
           <button
+            id="google-fallback-button"
             onClick={handleGoogleLogin}
             className="w-full flex justify-center items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
           >

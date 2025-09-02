@@ -362,6 +362,73 @@ class ApiService {
       return null
     }
   }
+
+  // Get files from a chat session
+  async getChatFiles(chatId: string, token: string): Promise<any> {
+    try {
+      console.log('API getChatFiles - calling backend')
+      
+      const response = await this.makeAuthenticatedRequest(`${API_BASE_URL}/chat/${chatId}/files`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(token),
+      }, token)
+
+      if (!response.ok) {
+        console.error('API getChatFiles - failed:', response.status)
+        return null
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error('API getChatFiles - error:', error)
+      return null
+    }
+  }
+
+  // Get specific file content from a chat session
+  async getChatFileContent(chatId: string, filePath: string, token: string): Promise<any> {
+    try {
+      console.log('API getChatFileContent - calling backend')
+      
+      const response = await this.makeAuthenticatedRequest(`${API_BASE_URL}/chat/${chatId}/files/${encodeURIComponent(filePath)}`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(token),
+      }, token)
+
+      if (!response.ok) {
+        console.error('API getChatFileContent - failed:', response.status)
+        return null
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error('API getChatFileContent - error:', error)
+      return null
+    }
+  }
+
+  // Update file content in a chat session
+  async updateChatFile(chatId: string, filePath: string, content: string, token: string): Promise<any> {
+    try {
+      console.log('API updateChatFile - calling backend')
+      
+      const response = await this.makeAuthenticatedRequest(`${API_BASE_URL}/chat/${chatId}/files/${encodeURIComponent(filePath)}`, {
+        method: 'PUT',
+        headers: this.getAuthHeaders(token),
+        body: JSON.stringify({ content }),
+      }, token)
+
+      if (!response.ok) {
+        console.error('API updateChatFile - failed:', response.status)
+        return null
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error('API updateChatFile - error:', error)
+      return null
+    }
+  }
 }
 
 export const apiService = new ApiService()
