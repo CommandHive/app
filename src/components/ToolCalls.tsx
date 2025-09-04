@@ -44,6 +44,12 @@ const ToolsCall = ({
   const [toolParameters, setToolParameters] = useState<Record<string, Record<string, any>>>({});
   // State to store execution status and results for each tool
   const [toolStates, setToolStates] = useState<Record<string, ToolState>>({});
+  
+  // Payment-related state
+  const [walletAddress, setWalletAddress] = useState<string>('');
+  const [paymentSettings, setPaymentSettings] = useState<Record<string, { enabled: boolean, amount: string }>>({});
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   const updateParameter = (toolName: string, paramName: string, value: any) => {
     setToolParameters(prev => ({
@@ -112,8 +118,172 @@ const ToolsCall = ({
     return toolStates[toolName] || { isExecuting: false, result: null };
   };
 
+  // Payment-related functions
+  const updatePaymentSetting = (toolName: string, field: 'enabled' | 'amount', value: boolean | string) => {
+    setPaymentSettings(prev => ({
+      ...prev,
+      [toolName]: {
+        ...prev[toolName],
+        enabled: prev[toolName]?.enabled || false,
+        amount: prev[toolName]?.amount || '',
+        [field]: value
+      }
+    }));
+  };
+
+  const handleSavePayments = async () => {
+    setIsSaving(true);
+    setSaveStatus('idle');
+    
+    try {
+      // Here you would typically make an API call to save the payment settings
+      console.log('Saving payment settings:', {
+        walletAddress,
+        paymentSettings
+      });
+      
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      setSaveStatus('success');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    } catch (error) {
+      console.error('Failed to save payment settings:', error);
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const validateWalletAddress = (address: string): boolean => {
+    // Basic validation for wallet address (you might want to make this more specific based on your requirements)
+    return address.length > 0 && /^[a-zA-Z0-9]{20,}$/.test(address);
+  };
+
   return (
     <div className="h-full flex flex-col px-4 pb-6">
+      {/* Payments Section */}
+      <div className="flex items-center py-6">
+        <h3 className="text-[24px] font-semibold text-black">Payments</h3>
+      </div>
+      
+      <div className="mb-8 bg-[#FCFCFD] rounded-[12px] border border-gray-200 p-5">
+        {/* Wallet Address Input */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-800 mb-2">
+            Funds go to wallet address:
+          </label>
+          <input
+            type="text"
+            value={walletAddress}
+            onChange={(e) => setWalletAddress(e.target.value)}
+            placeholder="Enter wallet address"
+            className={`w-full bg-gray-100 rounded-[8px] px-3 py-2 text-sm text-gray-900 border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+              walletAddress && !validateWalletAddress(walletAddress) 
+                ? 'border-red-300 bg-red-50' 
+                : 'border-gray-200'
+            }`}
+          />
+          {walletAddress && !validateWalletAddress(walletAddress) && (
+            <p className="text-red-600 text-xs mt-1">Please enter a valid wallet address</p>
+          )}
+        </div>
+
+        {/* Payment Configuration Table */}
+        {tools.length > 0 && (
+          <div className="mb-6">
+            <h4 className="text-lg font-medium text-gray-900 mb-4">Payment Configuration</h4>
+            <div className="space-y-3">
+              {tools.map((tool, index) => {
+                const setting = paymentSettings[tool.name] || { enabled: false, amount: '' };
+                return (
+                  <div
+                    key={tool.name || index}
+                    className={`flex items-center gap-4 p-3 rounded-[8px] border transition-colors ${
+                      setting.enabled 
+                        ? 'border-gray-300 bg-white' 
+                        : 'border-gray-200 bg-gray-50'
+                    }`}
+                  >
+                    {/* Payment Enabled Checkbox */}
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id={`payment-${tool.name}`}
+                        checked={setting.enabled}
+                        onChange={(e) => updatePaymentSetting(tool.name, 'enabled', e.target.checked)}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor={`payment-${tool.name}`} className="ml-2 text-sm text-gray-700">
+                        Payment Enabled
+                      </label>
+                    </div>
+
+                    {/* MCP Tool Call Name */}
+                    <div className="flex-1">
+                      <span className={`text-sm font-medium ${
+                        setting.enabled ? 'text-gray-900' : 'text-gray-500'
+                      }`}>
+                        {tool.name}
+                      </span>
+                    </div>
+
+                    {/* Token Amount Input */}
+                    <div className="w-32">
+                      <input
+                        type="number"
+                        value={setting.amount}
+                        onChange={(e) => updatePaymentSetting(tool.name, 'amount', e.target.value)}
+                        placeholder="0.00"
+                        disabled={!setting.enabled}
+                        className={`w-full px-3 py-1 text-sm rounded-[6px] border focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent ${
+                          setting.enabled
+                            ? 'bg-white border-gray-300 text-gray-900'
+                            : 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed'
+                        }`}
+                      />
+                      <span className={`text-xs ${setting.enabled ? 'text-gray-600' : 'text-gray-400'}`}>
+                        USDC
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Save Button */}
+        <button
+          onClick={handleSavePayments}
+          disabled={isSaving || !walletAddress || !validateWalletAddress(walletAddress)}
+          className={`px-4 py-2 text-sm font-medium rounded-md transition-colors flex items-center gap-2 ${
+            isSaving || !walletAddress || !validateWalletAddress(walletAddress)
+              ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+              : saveStatus === 'success'
+              ? 'bg-green-600 text-white'
+              : saveStatus === 'error'
+              ? 'bg-red-600 text-white'
+              : 'bg-slate-800 hover:bg-slate-700 text-white'
+          }`}
+        >
+          {isSaving ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+              <span>Saving...</span>
+            </>
+          ) : saveStatus === 'success' ? (
+            'Saved!'
+          ) : saveStatus === 'error' ? (
+            'Error - Try Again'
+          ) : (
+            'Save Payment Settings'
+          )}
+        </button>
+      </div>
+
+      {/* Available Tool Calls Section */}
       <div className="flex items-center py-6">
         <h3 className="text-[24px] font-semibold text-black">Available Tool Calls</h3>
       </div>

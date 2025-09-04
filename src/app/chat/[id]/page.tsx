@@ -91,7 +91,7 @@ export default function ChatPage() {
     )
   }
 
-  const tabs = ["Generated Code", "Tool Calls", "Environmental Variables", "Terminal", "MCP Proxy Servers"]
+  const tabs = ["Generated Code", "Tool Calls", "Environmental Variables", "Terminal"]
 
   return (
     <div className="min-h-screen bg-gray-50">

@@ -68,13 +68,15 @@ const CodeMirrorEditor = ({
   onCopy, 
   copied,
   files = [],
-  onSaveFile
+  onSaveFile,
+  selectMainPyIfExists
 }: { 
   initialCode: string; 
   onCopy: () => void; 
   copied: boolean;
   files?: FileNode[];
   onSaveFile?: (filePath: string, content: string) => Promise<boolean>;
+  selectMainPyIfExists?: (files: FileNode[]) => FileNode | null;
 }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const [editor, setEditor] = useState<any>(null);
@@ -84,6 +86,8 @@ const CodeMirrorEditor = ({
   const [currentCode, setCurrentCode] = useState(initialCode);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
+  const [isCurrentFileEditable, setIsCurrentFileEditable] = useState(true);
+  const [hasUserSelectedFile, setHasUserSelectedFile] = useState(false);
 
   const handleFileSelect = (file: FileNode) => {
     if (file.type === "file" && file.content !== undefined) {
@@ -91,13 +95,21 @@ const CodeMirrorEditor = ({
       setSelectedFile(file.path);
       setHasUnsavedChanges(false);
       setSaveStatus('idle');
+      setHasUserSelectedFile(true); // Mark that user has manually selected a file
+      
+      // Determine if file is editable (only main.py is editable)
+      const isMainPy = file.name === "main.py";
+      setIsCurrentFileEditable(isMainPy);
       
       // Update the editor content if it exists
       if (editor) {
         editor.setValue(file.content);
+        // Set read-only mode for files other than main.py
+        editor.setOption("readOnly", !isMainPy);
       }
     }
   };
+
 
   useEffect(() => {
     const loadCodeMirror = async () => {
@@ -238,6 +250,27 @@ const CodeMirrorEditor = ({
     }
   }, [editor, language]);
 
+  // Auto-select main.py when files change or component initializes (only if user hasn't manually selected a file)
+  useEffect(() => {
+    if (files && files.length > 0 && selectMainPyIfExists && !hasUserSelectedFile) {
+      const mainPyFile = selectMainPyIfExists(files);
+      if (mainPyFile && mainPyFile.content !== undefined) {
+        setCurrentCode(mainPyFile.content);
+        setSelectedFile(mainPyFile.path);
+        setHasUnsavedChanges(false);
+        setSaveStatus('idle');
+        setIsCurrentFileEditable(true); // main.py is always editable
+        
+        // Update the editor content if it exists
+        if (editor) {
+          editor.setValue(mainPyFile.content);
+          // Ensure main.py is editable (not read-only)
+          editor.setOption("readOnly", false);
+        }
+      }
+    }
+  }, [files, selectMainPyIfExists, editor, hasUserSelectedFile]);
+
   const detectLanguage = (code: string): string => {
     if (code.includes('def ') || code.includes('import ') || code.includes('print(')) return 'python';
     if (code.includes('function ') || code.includes('const ') || code.includes('console.log')) return 'javascript';
@@ -312,11 +345,15 @@ const CodeMirrorEditor = ({
       <div className="flex items-center justify-between px-6 py-4 bg-gray-50 border-b border-gray-200">
         <div className="flex items-center space-x-4">
           <h3 className="text-lg font-semibold text-gray-900">Generated Code</h3>
-          
+          {selectedFile && !isCurrentFileEditable && (
+            <span className="px-2 py-1 text-xs bg-gray-200 text-gray-600 rounded-md">
+              Read Only
+            </span>
+          )}
         </div>
         
         <div className="flex items-center space-x-2">
-          {selectedFile && (
+          {selectedFile && isCurrentFileEditable && (
             <>
               <button
                 onClick={handleSave}
@@ -471,6 +508,29 @@ export default function TabbedInterface({
   ]);
   const [currentInput, setCurrentInput] = useState("");
 
+  // Helper function to find and select main.py
+  const selectMainPyIfExists = (files: FileNode[]) => {
+    const findMainPy = (fileList: FileNode[]): FileNode | null => {
+      for (const file of fileList) {
+        if (file.type === "file" && file.name === "main.py" && file.content !== undefined) {
+          return file;
+        }
+        if (file.type === "folder" && file.children) {
+          const found = findMainPy(file.children);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    const mainPyFile = findMainPy(files);
+    if (mainPyFile && mainPyFile.content !== undefined) {
+      // This will be used by the CodeMirror component
+      return mainPyFile;
+    }
+    return null;
+  };
+
   // Extract tools from API response or messages
   const getToolsFromMessages = (): Tool[] => {
     // First priority: Check tools directly from chatData (from /create API response)
@@ -540,7 +600,9 @@ export default function TabbedInterface({
     try {
       const response = await apiService.getChatFiles(chatId, accessToken);
       if (response?.success) {
-        setChatFiles(response.files || []);
+        const files = response.files || [];
+        setChatFiles(files);
+        // Note: main.py auto-selection will be handled by CodeMirror component's useEffect
       }
     } catch (error) {
       console.error('Error loading chat files:', error);
@@ -565,6 +627,35 @@ export default function TabbedInterface({
       return () => clearTimeout(timer);
     }
   }, [messages.length]);
+
+  // Auto-select main.py when chatFiles change
+  useEffect(() => {
+    if (chatFiles && chatFiles.length > 0) {
+      // Only auto-select if no file is currently selected or if the selected file is not main.py
+      const findMainPy = (files: FileNode[]): FileNode | null => {
+        for (const file of files) {
+          if (file.type === "file" && file.name === "main.py" && file.content !== undefined) {
+            return file;
+          }
+          if (file.type === "folder" && file.children) {
+            const found = findMainPy(file.children);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+
+      const mainPyFile = findMainPy(chatFiles);
+      if (mainPyFile && mainPyFile.path) {
+        // Only set as selected if it's not already selected or if no file is selected
+        // This prevents overriding user selection when they manually choose another file
+        const isMainPyAlreadySelected = mainPyFile.path === chatFiles.find(f => f.name === "main.py")?.path;
+        if (!isMainPyAlreadySelected) {
+          // The auto-selection will be handled by the CodeMirror component's useEffect
+        }
+      }
+    }
+  }, [chatFiles]);
 
   // Save file content
   const saveFileContent = async (filePath: string, content: string) => {
@@ -772,9 +863,28 @@ export default function TabbedInterface({
     return latestMessage?.is_deployable ?? false;
   };
 
-  // Extract code from latest message with priority to database messages
+  // Extract code from files, prioritizing main.py content over message code
   const extractCodeFromResponse = (): string => {
-    // First, try to get code from the latest message with code from database
+    // First priority: Check if main.py exists in chatFiles and use its content
+    const findMainPy = (files: FileNode[]): FileNode | null => {
+      for (const file of files) {
+        if (file.type === "file" && file.name === "main.py" && file.content !== undefined) {
+          return file;
+        }
+        if (file.type === "folder" && file.children) {
+          const found = findMainPy(file.children);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    const mainPyFile = findMainPy(chatFiles);
+    if (mainPyFile && mainPyFile.content !== undefined) {
+      return mainPyFile.content;
+    }
+
+    // Second priority: try to get code from the latest message with code from database
     const latestMessage = getLatestMessageWithCode();
 
     if (latestMessage?.code) {
@@ -797,7 +907,7 @@ export default function TabbedInterface({
       }
     }
 
-    // Only fallback to chatData if no messages with code exist in database
+    // Third priority: fallback to chatData if no messages with code exist in database
     if (chatData?.code && messages.length === 0) {
       try {
         if (chatData.code.startsWith("```json")) {
@@ -1008,13 +1118,33 @@ export default function TabbedInterface({
   const renderTabContent = () => {
     switch (activeTab) {
       case "Generated Code":
+        // Get the main.py content as initial code if available
+        const getInitialCode = (): string => {
+          const findMainPy = (files: FileNode[]): FileNode | null => {
+            for (const file of files) {
+              if (file.type === "file" && file.name === "main.py" && file.content !== undefined) {
+                return file;
+              }
+              if (file.type === "folder" && file.children) {
+                const found = findMainPy(file.children);
+                if (found) return found;
+              }
+            }
+            return null;
+          };
+
+          const mainPyFile = findMainPy(chatFiles);
+          return mainPyFile?.content || extractCodeFromResponse();
+        };
+
         return (
           <CodeMirrorEditor
-            initialCode={extractCodeFromResponse()}
+            initialCode={getInitialCode()}
             onCopy={copyToClipboard}
             copied={copied}
             files={chatFiles}
             onSaveFile={saveFileContent}
+            selectMainPyIfExists={selectMainPyIfExists}
           />
         );
 
@@ -1027,8 +1157,8 @@ export default function TabbedInterface({
       case "Terminal":
         return <Terminal />;
 
-      case "MCP Proxy Servers":
-        return <MCPProxyServer/>
+      // case "MCP Proxy Servers":
+      //   return <MCPProxyServer/>
 
       default:
         return (

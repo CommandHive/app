@@ -16,6 +16,7 @@ function NewChatContent() {
   const [error, setError] = useState<string | null>(null)
   const [chatData, setChatData] = useState<any>(null)
   const [messages, setMessages] = useState<any[]>([])
+  const [activeTab, setActiveTab] = useState("Generated Code")
 
   const hasCreatedChat = useRef(false)
   const isCreating = useRef(false)
@@ -91,9 +92,11 @@ function NewChatContent() {
     )
   }
 
+  const tabs = ["Generated Code", "Tool Calls", "Environmental Variables", "Terminal"]
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="flex h-screen">
+      <div className="flex h-[calc(100vh-72px)] mt-[72px]">
         <div className="w-[30%] border-r border-gray-300 bg-white">
           <ChatWindow
             chatId={chatId || 'creating'}
@@ -104,7 +107,7 @@ function NewChatContent() {
           />
         </div>
 
-        <div className="w-[70%] bg-white">
+        <div className="w-[70%] bg-white flex flex-col">
           {isCreatingChat ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-center">
@@ -114,7 +117,37 @@ function NewChatContent() {
               </div>
             </div>
           ) : (
-            <TabbedInterface chatId={chatId || ''} chatData={chatData} messages={messages} />
+            <>
+              {/* Tab Header */}
+              <div className="border-b border-gray-200">
+                <div className="flex items-center">
+                  {tabs.map((tab) => (
+                    <div key={tab} className="border-r border-gray-300 hover:bg-gray-200">  
+                      <button
+                        onClick={() => setActiveTab(tab)}
+                        className={`px-4 py-[16px] text-[16px] font-medium transition-colors ${
+                          activeTab === tab
+                            ? "border-gray-600 bg-gray-200 border-b-4 text-gray-600 font-semibold"
+                            : "border-transparent text-gray-500 hover:text-gray-700"
+                        }`}
+                      >
+                        {tab}
+                      </button>
+                    </div>
+                  ))}
+                  <div className="ml-auto">
+                    <button className="px-4 py-[10px] bg-[#FDB022] hover:bg-[#FDB022]/80 text-black text-[16px] font-semibold rounded-lg">
+                      Deploy
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tab Content */}
+              <div className="flex-1">
+                <TabbedInterface chatId={chatId || ''} chatData={chatData} messages={messages} activeTab={activeTab} />
+              </div>
+            </>
           )}
         </div>
       </div>

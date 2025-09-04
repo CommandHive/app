@@ -121,11 +121,17 @@ const HomePage = () => {
       sessionToken ? sessionToken.substring(0, 20) + "..." : "NO TOKEN"
     );
     console.log("🏠 [Homepage] isAuthenticated from hook:", isAuthenticated);
-    if(isAuthenticated){
-      router.push('/');
+    
+    // Refresh page when user becomes authenticated (after login)
+    const wasUnauthenticated = !localStorageToken;
+    if (isAuthenticated && wasUnauthenticated && sessionToken) {
+      console.log("🏠 [Homepage] User just logged in, refreshing page");
+      window.location.reload();
+      return;
     }
+    
     setLocalStorageToken(accessTokenStored);
-  }, [sessionToken, isAuthenticated]);
+  }, [sessionToken, isAuthenticated, localStorageToken]);
 
   // Search/Create functionality from old code
   const handleSearch = async () => {
@@ -265,15 +271,15 @@ const HomePage = () => {
   return (
     <main className="w-[1217px] flex flex-col mx-auto gap-14 mb-10">
       {/* Hero Section */}
-      <div className="flex flex-col items-center gap-[60px] pt-[192px] max-w-[1010px] mx-auto">
+      <div className="flex flex-col items-center gap-[60px] pt-[150px] max-w-[1010px] mx-auto">
         <div className="text-center w-[596px]">
-          <h1 className="text-[40px] font-semibold text-[#14110E] mb-6">
-            Build MCP Server In Minutes
+          <h1 className="text-[56px] font-semibold text-[#14110E] mb-6 leading-tight">
+            Build, Deploy and Earn from MCP Servers
             <span className="text-orange-500">.</span>
           </h1>
           <p className="text-[16px] font-normal text-[#667085]">
             Describe what you want to build and we&apos;ll generate an MCP
-            server for you with full implementation and documentation.
+            server for you! Bring your ideas to life. 
           </p>
         </div>
 
